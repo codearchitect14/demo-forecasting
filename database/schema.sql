@@ -267,7 +267,7 @@ BEGIN
     normal_sales AS (
         SELECT
             h.date,
-            AVG(
+            (
                 SELECT AVG(sd2.sale_amount)
                 FROM sales_data sd2
                 WHERE 

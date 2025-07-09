@@ -130,7 +130,17 @@ class PromoUpliftModel:
             avg_sales_pivot.columns.name = None
             avg_sales_pivot = avg_sales_pivot.rename(columns={True: 'promo_sales', False: 'non_promo_sales'})
             
-            # Calculate uplift
+            # Add debug prints before pivot
+            if hasattr(df, 'shape'):
+                print('prepare_data input shape:', df.shape)
+            else:
+                print('prepare_data input length:', len(df))
+            print('promo_flag counts:', df['promo_flag'].value_counts(dropna=False))
+            print('Grouping columns:', df.columns.tolist())
+            # After creating avg_sales_pivot
+            if 'promo_sales' not in avg_sales_pivot.columns or 'non_promo_sales' not in avg_sales_pivot.columns:
+                shape_info = df.shape if hasattr(df, 'shape') else len(df)
+                raise ValueError(f'Not enough promo/non-promo sales for uplift calculation. Data shape: {shape_info}, promo_flag counts: {df["promo_flag"].value_counts(dropna=False).to_dict()}, columns: {df.columns.tolist()}')
             avg_sales_pivot['uplift'] = avg_sales_pivot['promo_sales'] - avg_sales_pivot['non_promo_sales']
             avg_sales_pivot['uplift_pct'] = (avg_sales_pivot['uplift'] / avg_sales_pivot['non_promo_sales']) * 100
             
