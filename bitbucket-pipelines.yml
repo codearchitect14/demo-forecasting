@@ -1,32 +1,40 @@
 image: python:3.10
 
 pipelines:
-  default:
-    - parallel:
-        - step:
-            name: Run Tests with Coverage
-            caches:
-              - pip
-            script:
-              - pip install -r requirements.txt
-              - pytest --cov=./ --cov-report=xml --junitxml=test-reports/report.xml
+  branches:
+    '**':  # Run pipeline on all branches
+      - parallel:
+          - step:
+              name: Run Tests with Coverage
+              caches:
+                - pip
+              script:
+                - pip install -r requirements.txt
+                - pip install pytest pytest-cov
+                - pytest --cov=./ --cov-report=xml --junitxml=test-reports/report.xml
 
-        - step:
-            name: Lint Code (flake8 + async + style checks)
-            script:
-              - pip install -r requirements.txt
-              - pip install flake8 flake8-async flake8-bugbear flake8-docstrings
-              - flake8 . --extend-exclude=dist,build,venv --show-source --statistics
+          - step:
+              name: Lint Code (flake8 + async + style checks)
+              caches:
+                - pip
+              script:
+                - pip install -r requirements.txt
+                - pip install flake8 flake8-async flake8-bugbear flake8-docstrings
+                - flake8 . --extend-exclude=dist,build,venv --show-source --statistics
 
-        - step:
-            name: Type Check (mypy)
-            script:
-              - pip install -r requirements.txt
-              - pip install mypy
-              - mypy .
+          - step:
+              name: Type Check (mypy)
+              caches:
+                - pip
+              script:
+                - pip install -r requirements.txt
+                - pip install mypy
+                - mypy .
 
-        - step:
-            name: Code Formatter (Black Check)
-            script:
-              - pip install black
-              - black . --check
+          - step:
+              name: Code Formatter (Black Check)
+              caches:
+                - pip
+              script:
+                - pip install black
+                - black . --check
