@@ -3,11 +3,12 @@ fastapi==0.103.1
 uvicorn==0.23.2
 python-dotenv==1.0.0
 pydantic==2.3.0
-pandas==1.5.3
+pandas==2.1.4
 numpy==1.24.3
 sqlalchemy==1.4.49
 psycopg2-binary==2.9.9
 python-multipart==0.0.6
+black==24.4.2
 
 # Data processing and visualization
 matplotlib==3.7.2
