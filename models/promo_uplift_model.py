@@ -70,12 +70,14 @@ class PromoUpliftModel:
             }
             # Override with user params if provided
             params.update(self.model_params)
-            self.model = LinearRegression(**params) # Changed from GradientBoostingRegressor
+            self.model = LinearRegression(
+                **params
+            )  # Changed from GradientBoostingRegressor
         elif self.model_type == "elastic_net":
             params = {"alpha": 0.1, "l1_ratio": 0.5, "random_state": 42}
             # Override with user params if provided
             params.update(self.model_params)
-            self.model = LinearRegression(**params) # Changed from ElasticNet
+            self.model = LinearRegression(**params)  # Changed from ElasticNet
         else:
             raise ValueError(
                 f"Unsupported model_type: {self.model_type}. "

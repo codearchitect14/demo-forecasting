@@ -21,7 +21,10 @@ class ProphetForecaster:
     forecast_freq: str
 
     def __init__(
-        self, include_weather: bool = True, include_holidays: bool = True, include_promotions: bool = True
+        self,
+        include_weather: bool = True,
+        include_holidays: bool = True,
+        include_promotions: bool = True,
     ):
         """Initialize the Prophet model with appropriate components"""
         self.model = Prophet(
@@ -193,7 +196,11 @@ class ProphetForecaster:
             if hasattr(self.model, "extra_regressors"):
                 for regressor_name in self.model.extra_regressors:
                     # Use the mean value from training for forecasting
-                    value = self.model.history[regressor_name].mean() if self.model.history is not None else 0
+                    value = (
+                        self.model.history[regressor_name].mean()
+                        if self.model.history is not None
+                        else 0
+                    )
                     future[regressor_name] = value
 
         print("DEBUG: Calling model.predict...")
@@ -212,7 +219,9 @@ class ProphetForecaster:
     def plot_components(self, forecast_df=None):
         """Plot forecast components"""
         if forecast_df is None:
-            raise ValueError("A forecast DataFrame must be provided to plot components.")
+            raise ValueError(
+                "A forecast DataFrame must be provided to plot components."
+            )
         fig = self.model.plot_components(forecast_df)
         return fig
 

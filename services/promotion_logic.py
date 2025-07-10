@@ -50,13 +50,17 @@ def simulate_and_recommend_promotions(
             try:
                 pred_uplift_result = model.predict(sim_data)
                 # Handle different return types from model.predict with proper type checking
-                if hasattr(pred_uplift_result, 'mean'):
+                if hasattr(pred_uplift_result, "mean"):
                     pred_uplift = float(pred_uplift_result.mean())
-                elif hasattr(pred_uplift_result, '__iter__') and not isinstance(pred_uplift_result, (str, bytes)):
-                    pred_uplift = float(sum(pred_uplift_result) / len(pred_uplift_result))
+                elif hasattr(pred_uplift_result, "__iter__") and not isinstance(
+                    pred_uplift_result, (str, bytes)
+                ):
+                    pred_uplift = float(
+                        sum(pred_uplift_result) / len(pred_uplift_result)
+                    )
                 else:
                     pred_uplift = float(pred_uplift_result)
-                
+
                 if pred_uplift <= 0:
                     continue
                 discount_cost = float(baseline) * discount
@@ -96,12 +100,18 @@ def simulate_and_recommend_promotions(
             for rec in top_recommendations
             if float(rec["estimated_uplift"]) >= float(target_uplift)
         ]
-    
+
     # Calculate averages with proper type handling
     if top_recommendations:
-        avg_uplift = sum(float(rec["estimated_uplift"]) for rec in top_recommendations) / len(top_recommendations)
-        avg_roi = sum(float(rec["estimated_roi"]) for rec in top_recommendations) / len(top_recommendations)
-        avg_discount = sum(float(rec["discount_percentage"]) for rec in top_recommendations) / len(top_recommendations)
+        avg_uplift = sum(
+            float(rec["estimated_uplift"]) for rec in top_recommendations
+        ) / len(top_recommendations)
+        avg_roi = sum(float(rec["estimated_roi"]) for rec in top_recommendations) / len(
+            top_recommendations
+        )
+        avg_discount = sum(
+            float(rec["discount_percentage"]) for rec in top_recommendations
+        ) / len(top_recommendations)
     else:
         avg_uplift = 0.0
         avg_roi = 0.0
