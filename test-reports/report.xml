@@ -1,0 +1,544 @@
+<?xml version="1.0" encoding="utf-8"?><testsuites><testsuite name="pytest" errors="0" failures="6" skipped="0" tests="16" time="4.965" timestamp="2025-07-11T01:54:59.981701" hostname="Boolmind-Macs-MacBook-Pro.local"><testcase classname="tests.test_forecast.TestGenerateForecast" name="test_generate_forecast_basic" time="0.114"><failure message="AssertionError: assert 'forecast_data' in {'forecast': [{'date': Timestamp('2024-01-01 00:00:00'), 'forecast': 94.23825454045456, 'lower_bound': 91.791585394230...4026, 'lower_bound': 82.39983090436853, 'upper_bound': 107.88079246637741}, ...], 'metrics': {'mae': 0.05, 'mse': 0.1}}">self = &lt;tests.test_forecast.TestGenerateForecast object at 0x11b8eb160&gt;
+mock_request = &lt;tests.test_forecast.MockForecastRequest object at 0x11b8fca90&gt;
+mock_model = &lt;tests.test_forecast.MockModel object at 0x11b8fc9a0&gt;
+sample_historical_data =             ds           y  store_id  product_id
+0   2023-01-01   80.909255         1           1
+1   2023-01-02  104....3 2023-12-30  113.171452         1           1
+364 2023-12-31   87.355556         1           1
+
+[365 rows x 4 columns]
+
+    @pytest.mark.asyncio
+    async def test_generate_forecast_basic(self, mock_request, mock_model, sample_historical_data):
+        """Test basic forecast generation"""
+    
+        # Mock the data fetch functions
+        async def mock_fetch_historical():
+            return sample_historical_data
+    
+        async def mock_fetch_weather():
+            return None
+    
+        async def mock_fetch_promotion():
+            return None
+    
+        result = await generate_forecast(
+            model=mock_model,
+            request=mock_request,
+            fetch_historical_data_fn=mock_fetch_historical,
+            fetch_weather_data_fn=mock_fetch_weather,
+            fetch_promotion_data_fn=mock_fetch_promotion
+        )
+    
+        # Verify the result structure
+        assert isinstance(result, dict)
+&gt;       assert 'forecast_data' in result
+E       AssertionError: assert 'forecast_data' in {'forecast': [{'date': Timestamp('2024-01-01 00:00:00'), 'forecast': 94.23825454045456, 'lower_bound': 91.791585394230...4026, 'lower_bound': 82.39983090436853, 'upper_bound': 107.88079246637741}, ...], 'metrics': {'mae': 0.05, 'mse': 0.1}}
+
+tests/test_forecast.py:142: AssertionError</failure></testcase><testcase classname="tests.test_forecast.TestGenerateForecast" name="test_generate_forecast_with_weather" time="0.083"><failure message="AssertionError: assert 'forecast_data' in {'forecast': [{'date': Timestamp('2024-01-01 00:00:00'), 'forecast': 87.72660336603018, 'lower_bound': 104.02440326056...5216, 'lower_bound': 87.92799048325368, 'upper_bound': 112.37909767135388}, ...], 'metrics': {'mae': 0.05, 'mse': 0.1}}">self = &lt;tests.test_forecast.TestGenerateForecast object at 0x11b8eb280&gt;
+mock_request = &lt;tests.test_forecast.MockForecastRequest object at 0x11b8fc610&gt;
+mock_model = &lt;tests.test_forecast.MockModel object at 0x11bb9eee0&gt;
+sample_historical_data =             ds           y  store_id  product_id
+0   2023-01-01  114.763705         1           1
+1   2023-01-02   74....3 2023-12-30   80.939297         1           1
+364 2023-12-31   90.431687         1           1
+
+[365 rows x 4 columns]
+sample_weather_data =          date   temp_avg   humidity  precipitation  wind_speed
+0  2024-01-01  18.569737  70.710197       0.550708    8...4-01-30  18.064890  53.844595       1.129361    1.654387
+30 2024-01-31  20.247051  55.516747       2.327991    3.071696
+
+    @pytest.mark.asyncio
+    async def test_generate_forecast_with_weather(self, mock_request, mock_model,
+                                                  sample_historical_data, sample_weather_data):
+        """Test forecast generation with weather data"""
+    
+        async def mock_fetch_historical():
+            return sample_historical_data
+    
+        async def mock_fetch_weather():
+            return sample_weather_data
+    
+        async def mock_fetch_promotion():
+            return None
+    
+        result = await generate_forecast(
+            model=mock_model,
+            request=mock_request,
+            fetch_historical_data_fn=mock_fetch_historical,
+            fetch_weather_data_fn=mock_fetch_weather,
+            fetch_promotion_data_fn=mock_fetch_promotion
+        )
+    
+        assert isinstance(result, dict)
+&gt;       assert 'forecast_data' in result
+E       AssertionError: assert 'forecast_data' in {'forecast': [{'date': Timestamp('2024-01-01 00:00:00'), 'forecast': 87.72660336603018, 'lower_bound': 104.02440326056...5216, 'lower_bound': 87.92799048325368, 'upper_bound': 112.37909767135388}, ...], 'metrics': {'mae': 0.05, 'mse': 0.1}}
+
+tests/test_forecast.py:170: AssertionError</failure></testcase><testcase classname="tests.test_forecast.TestGenerateForecast" name="test_generate_forecast_insufficient_data" time="0.029" /><testcase classname="tests.test_forecast.TestDataFetchFunctions" name="test_fetch_historical_data_structure" time="0.057" /><testcase classname="tests.test_forecast.TestDataFetchFunctions" name="test_fetch_weather_data_structure" time="0.006" /><testcase classname="tests.test_forecast.TestDataFetchFunctions" name="test_fetch_promotion_data_structure" time="0.009" /><testcase classname="tests.test_forecast.TestDataFetchFunctions" name="test_fetch_holiday_data_structure" time="0.006" /><testcase classname="tests.test_forecast.TestAnalysisFunctions" name="test_analyze_promotion_effectiveness" time="0.008"><failure message="KeyError: 'sale_date'">self = Index(['ds', 'y', 'store_id', 'product_id'], dtype='object'), key = 'sale_date'
+
+    def get_loc(self, key):
+        """
+        Get integer location, slice or boolean mask for requested label.
+    
+        Parameters
+        ----------
+        key : label
+    
+        Returns
+        -------
+        int if unique index, slice if monotonic index, else mask
+    
+        Examples
+        --------
+        &gt;&gt;&gt; unique_index = pd.Index(list('abc'))
+        &gt;&gt;&gt; unique_index.get_loc('b')
+        1
+    
+        &gt;&gt;&gt; monotonic_index = pd.Index(list('abbc'))
+        &gt;&gt;&gt; monotonic_index.get_loc('b')
+        slice(1, 3, None)
+    
+        &gt;&gt;&gt; non_monotonic_index = pd.Index(list('abcb'))
+        &gt;&gt;&gt; non_monotonic_index.get_loc('b')
+        array([False,  True, False,  True])
+        """
+        casted_key = self._maybe_cast_indexer(key)
+        try:
+&gt;           return self._engine.get_loc(casted_key)
+
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/indexes/base.py:3791: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+index.pyx:152: in pandas._libs.index.IndexEngine.get_loc
+    ???
+index.pyx:181: in pandas._libs.index.IndexEngine.get_loc
+    ???
+pandas/_libs/hashtable_class_helper.pxi:7080: in pandas._libs.hashtable.PyObjectHashTable.get_item
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+&gt;   ???
+E   KeyError: 'sale_date'
+
+pandas/_libs/hashtable_class_helper.pxi:7088: KeyError
+
+The above exception was the direct cause of the following exception:
+
+self = &lt;tests.test_forecast.TestAnalysisFunctions object at 0x11b8ebaf0&gt;
+sample_historical_data =             ds           y  store_id  product_id
+0   2023-01-01  103.547915         1           1
+1   2023-01-02  100....3 2023-12-30  124.859217         1           1
+364 2023-12-31   78.361049         1           1
+
+[365 rows x 4 columns]
+sample_promotion_data =    id  start_date    end_date  discount_percentage  store_id  product_id
+0   1  2024-01-10  2024-01-15                 10.0         1           1
+1   2  2024-01-20  2024-01-25                 15.0         1           1
+mock_request = &lt;tests.test_forecast.MockForecastRequest object at 0x11bc11370&gt;
+mock_model = &lt;tests.test_forecast.MockModel object at 0x11bc11250&gt;
+
+    @pytest.mark.asyncio
+    async def test_analyze_promotion_effectiveness(self, sample_historical_data,
+                                                   sample_promotion_data, mock_request, mock_model):
+        """Test promotion effectiveness analysis"""
+    
+&gt;       result = await analyze_promotion_effectiveness(
+            df=sample_historical_data,
+            promo_data=sample_promotion_data,
+            model=mock_model,
+            request=mock_request
+        )
+
+tests/test_forecast.py:278: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+services/forecast_service.py:559: in analyze_promotion_effectiveness
+    sale_date = pd.to_datetime(row["sale_date"])
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/series.py:1040: in __getitem__
+    return self._get_value(key)
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/series.py:1156: in _get_value
+    loc = self.index.get_loc(label)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = Index(['ds', 'y', 'store_id', 'product_id'], dtype='object'), key = 'sale_date'
+
+    def get_loc(self, key):
+        """
+        Get integer location, slice or boolean mask for requested label.
+    
+        Parameters
+        ----------
+        key : label
+    
+        Returns
+        -------
+        int if unique index, slice if monotonic index, else mask
+    
+        Examples
+        --------
+        &gt;&gt;&gt; unique_index = pd.Index(list('abc'))
+        &gt;&gt;&gt; unique_index.get_loc('b')
+        1
+    
+        &gt;&gt;&gt; monotonic_index = pd.Index(list('abbc'))
+        &gt;&gt;&gt; monotonic_index.get_loc('b')
+        slice(1, 3, None)
+    
+        &gt;&gt;&gt; non_monotonic_index = pd.Index(list('abcb'))
+        &gt;&gt;&gt; non_monotonic_index.get_loc('b')
+        array([False,  True, False,  True])
+        """
+        casted_key = self._maybe_cast_indexer(key)
+        try:
+            return self._engine.get_loc(casted_key)
+        except KeyError as err:
+            if isinstance(casted_key, slice) or (
+                isinstance(casted_key, abc.Iterable)
+                and any(isinstance(x, slice) for x in casted_key)
+            ):
+                raise InvalidIndexError(key)
+&gt;           raise KeyError(key) from err
+E           KeyError: 'sale_date'
+
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/indexes/base.py:3798: KeyError</failure></testcase><testcase classname="tests.test_forecast.TestAnalysisFunctions" name="test_analyze_stockout" time="0.007"><failure message="KeyError: 'sale_date'">self = Index(['ds', 'y', 'store_id', 'product_id', 'stock_hour6_22_cnt',
+       'sale_amount', 'is_stockout'],
+      dtype='object')
+key = 'sale_date'
+
+    def get_loc(self, key):
+        """
+        Get integer location, slice or boolean mask for requested label.
+    
+        Parameters
+        ----------
+        key : label
+    
+        Returns
+        -------
+        int if unique index, slice if monotonic index, else mask
+    
+        Examples
+        --------
+        &gt;&gt;&gt; unique_index = pd.Index(list('abc'))
+        &gt;&gt;&gt; unique_index.get_loc('b')
+        1
+    
+        &gt;&gt;&gt; monotonic_index = pd.Index(list('abbc'))
+        &gt;&gt;&gt; monotonic_index.get_loc('b')
+        slice(1, 3, None)
+    
+        &gt;&gt;&gt; non_monotonic_index = pd.Index(list('abcb'))
+        &gt;&gt;&gt; non_monotonic_index.get_loc('b')
+        array([False,  True, False,  True])
+        """
+        casted_key = self._maybe_cast_indexer(key)
+        try:
+&gt;           return self._engine.get_loc(casted_key)
+
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/indexes/base.py:3791: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+index.pyx:152: in pandas._libs.index.IndexEngine.get_loc
+    ???
+index.pyx:181: in pandas._libs.index.IndexEngine.get_loc
+    ???
+pandas/_libs/hashtable_class_helper.pxi:7080: in pandas._libs.hashtable.PyObjectHashTable.get_item
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+&gt;   ???
+E   KeyError: 'sale_date'
+
+pandas/_libs/hashtable_class_helper.pxi:7088: KeyError
+
+The above exception was the direct cause of the following exception:
+
+self = &lt;tests.test_forecast.TestAnalysisFunctions object at 0x11b8ebca0&gt;
+sample_historical_data =             ds           y  store_id  product_id  stock_hour6_22_cnt  sale_amount  is_stockout
+0   2023-01-01  119.723...
+364 2023-12-31  117.934312         1           1                   0          0.0         True
+
+[365 rows x 7 columns]
+mock_request = &lt;tests.test_forecast.MockForecastRequest object at 0x11bf30f40&gt;
+
+    @pytest.mark.asyncio
+    async def test_analyze_stockout(self, sample_historical_data, mock_request):
+        """Test stockout analysis"""
+    
+&gt;       result = await analyze_stockout(df=sample_historical_data, request=mock_request)
+
+tests/test_forecast.py:292: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+services/forecast_service.py:656: in analyze_stockout
+    sale_dates = pd.to_datetime(df.loc[~df["is_stockout"], "sale_date"])
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/indexing.py:1147: in __getitem__
+    return self._getitem_tuple(key)
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/indexing.py:1330: in _getitem_tuple
+    return self._getitem_lowerdim(tup)
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/indexing.py:1039: in _getitem_lowerdim
+    section = self._getitem_axis(key, axis=i)
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/indexing.py:1393: in _getitem_axis
+    return self._get_label(key, axis=axis)
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/indexing.py:1343: in _get_label
+    return self.obj.xs(label, axis=axis)
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/generic.py:4222: in xs
+    return self[key]
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/frame.py:3893: in __getitem__
+    indexer = self.columns.get_loc(key)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = Index(['ds', 'y', 'store_id', 'product_id', 'stock_hour6_22_cnt',
+       'sale_amount', 'is_stockout'],
+      dtype='object')
+key = 'sale_date'
+
+    def get_loc(self, key):
+        """
+        Get integer location, slice or boolean mask for requested label.
+    
+        Parameters
+        ----------
+        key : label
+    
+        Returns
+        -------
+        int if unique index, slice if monotonic index, else mask
+    
+        Examples
+        --------
+        &gt;&gt;&gt; unique_index = pd.Index(list('abc'))
+        &gt;&gt;&gt; unique_index.get_loc('b')
+        1
+    
+        &gt;&gt;&gt; monotonic_index = pd.Index(list('abbc'))
+        &gt;&gt;&gt; monotonic_index.get_loc('b')
+        slice(1, 3, None)
+    
+        &gt;&gt;&gt; non_monotonic_index = pd.Index(list('abcb'))
+        &gt;&gt;&gt; non_monotonic_index.get_loc('b')
+        array([False,  True, False,  True])
+        """
+        casted_key = self._maybe_cast_indexer(key)
+        try:
+            return self._engine.get_loc(casted_key)
+        except KeyError as err:
+            if isinstance(casted_key, slice) or (
+                isinstance(casted_key, abc.Iterable)
+                and any(isinstance(x, slice) for x in casted_key)
+            ):
+                raise InvalidIndexError(key)
+&gt;           raise KeyError(key) from err
+E           KeyError: 'sale_date'
+
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/indexes/base.py:3798: KeyError</failure></testcase><testcase classname="tests.test_forecast.TestAnalysisFunctions" name="test_analyze_holiday_impact" time="0.005"><failure message="KeyError: 'sale_date'">self = Index(['ds', 'y', 'store_id', 'product_id'], dtype='object'), key = 'sale_date'
+
+    def get_loc(self, key):
+        """
+        Get integer location, slice or boolean mask for requested label.
+    
+        Parameters
+        ----------
+        key : label
+    
+        Returns
+        -------
+        int if unique index, slice if monotonic index, else mask
+    
+        Examples
+        --------
+        &gt;&gt;&gt; unique_index = pd.Index(list('abc'))
+        &gt;&gt;&gt; unique_index.get_loc('b')
+        1
+    
+        &gt;&gt;&gt; monotonic_index = pd.Index(list('abbc'))
+        &gt;&gt;&gt; monotonic_index.get_loc('b')
+        slice(1, 3, None)
+    
+        &gt;&gt;&gt; non_monotonic_index = pd.Index(list('abcb'))
+        &gt;&gt;&gt; non_monotonic_index.get_loc('b')
+        array([False,  True, False,  True])
+        """
+        casted_key = self._maybe_cast_indexer(key)
+        try:
+&gt;           return self._engine.get_loc(casted_key)
+
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/indexes/base.py:3791: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+index.pyx:152: in pandas._libs.index.IndexEngine.get_loc
+    ???
+index.pyx:181: in pandas._libs.index.IndexEngine.get_loc
+    ???
+pandas/_libs/hashtable_class_helper.pxi:7080: in pandas._libs.hashtable.PyObjectHashTable.get_item
+    ???
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+&gt;   ???
+E   KeyError: 'sale_date'
+
+pandas/_libs/hashtable_class_helper.pxi:7088: KeyError
+
+The above exception was the direct cause of the following exception:
+
+self = &lt;tests.test_forecast.TestAnalysisFunctions object at 0x11b8ebdf0&gt;
+sample_historical_data =             ds           y  store_id  product_id
+0   2023-01-01  109.172088         1           1
+1   2023-01-02  100....3 2023-12-30  114.886242         1           1
+364 2023-12-31  103.067957         1           1
+
+[365 rows x 4 columns]
+mock_request = &lt;tests.test_forecast.MockForecastRequest object at 0x11cb75c40&gt;
+
+    @pytest.mark.asyncio
+    async def test_analyze_holiday_impact(self, sample_historical_data, mock_request):
+        """Test holiday impact analysis"""
+    
+        # Create sample holiday data
+        holidays_df = pd.DataFrame({
+            'holiday': ['New Year', 'Christmas'],
+            'ds': [datetime(2023, 1, 1), datetime(2023, 12, 25)]
+        })
+    
+&gt;       result = await analyze_holiday_impact(
+            df=sample_historical_data,
+            holidays_df=holidays_df,
+            request=mock_request
+        )
+
+tests/test_forecast.py:307: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+services/forecast_service.py:731: in analyze_holiday_impact
+    sales_data["sale_date"] = pd.to_datetime(sales_data["sale_date"])
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/frame.py:3893: in __getitem__
+    indexer = self.columns.get_loc(key)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = Index(['ds', 'y', 'store_id', 'product_id'], dtype='object'), key = 'sale_date'
+
+    def get_loc(self, key):
+        """
+        Get integer location, slice or boolean mask for requested label.
+    
+        Parameters
+        ----------
+        key : label
+    
+        Returns
+        -------
+        int if unique index, slice if monotonic index, else mask
+    
+        Examples
+        --------
+        &gt;&gt;&gt; unique_index = pd.Index(list('abc'))
+        &gt;&gt;&gt; unique_index.get_loc('b')
+        1
+    
+        &gt;&gt;&gt; monotonic_index = pd.Index(list('abbc'))
+        &gt;&gt;&gt; monotonic_index.get_loc('b')
+        slice(1, 3, None)
+    
+        &gt;&gt;&gt; non_monotonic_index = pd.Index(list('abcb'))
+        &gt;&gt;&gt; non_monotonic_index.get_loc('b')
+        array([False,  True, False,  True])
+        """
+        casted_key = self._maybe_cast_indexer(key)
+        try:
+            return self._engine.get_loc(casted_key)
+        except KeyError as err:
+            if isinstance(casted_key, slice) or (
+                isinstance(casted_key, abc.Iterable)
+                and any(isinstance(x, slice) for x in casted_key)
+            ):
+                raise InvalidIndexError(key)
+&gt;           raise KeyError(key) from err
+E           KeyError: 'sale_date'
+
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/indexes/base.py:3798: KeyError</failure></testcase><testcase classname="tests.test_forecast.TestRequestValidation" name="test_mock_request_attributes" time="0.001" /><testcase classname="tests.test_forecast.TestRequestValidation" name="test_mock_model_attributes" time="0.001" /><testcase classname="tests.test_forecast.TestForecastIntegration" name="test_end_to_end_forecast_flow" time="0.049"><failure message="KeyError: &quot;None of [Index(['ds', 'temp_avg'], dtype='object')] are in the [columns]&quot;">self = &lt;tests.test_forecast.TestForecastIntegration object at 0x11b8fc2b0&gt;
+mock_request = &lt;tests.test_forecast.MockForecastRequest object at 0x11cb75880&gt;
+sample_historical_data =             ds           y  store_id  product_id
+0   2023-01-01   78.347501         1           1
+1   2023-01-02   80....3 2023-12-30  117.314836         1           1
+364 2023-12-31   80.825568         1           1
+
+[365 rows x 4 columns]
+
+    @pytest.mark.asyncio
+    async def test_end_to_end_forecast_flow(self, mock_request, sample_historical_data):
+        """Test the complete forecast flow with mocked components"""
+    
+        # Create a more realistic model mock
+        model = MockModel()
+    
+        async def fetch_hist():
+            return sample_historical_data
+    
+        async def fetch_weather():
+            return pd.DataFrame()
+    
+        async def fetch_promo():
+            return pd.DataFrame()
+    
+        # This should complete without errors
+&gt;       result = await generate_forecast(
+            model=model,
+            request=mock_request,
+            fetch_historical_data_fn=fetch_hist,
+            fetch_weather_data_fn=fetch_weather,
+            fetch_promotion_data_fn=fetch_promo
+        )
+
+tests/test_forecast.py:359: 
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+services/forecast_service.py:121: in generate_forecast
+    "temp_avg": weather_data[["ds", "temp_avg"]],
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/frame.py:3899: in __getitem__
+    indexer = self.columns._get_indexer_strict(key, "columns")[1]
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/indexes/base.py:6115: in _get_indexer_strict
+    self._raise_if_missing(keyarr, indexer, axis_name)
+_ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _ _
+
+self = Index([], dtype='object'), key = Index(['ds', 'temp_avg'], dtype='object')
+indexer = array([-1, -1]), axis_name = 'columns'
+
+    def _raise_if_missing(self, key, indexer, axis_name: str_t) -&gt; None:
+        """
+        Check that indexer can be used to return a result.
+    
+        e.g. at least one element was found,
+        unless the list of keys was actually empty.
+    
+        Parameters
+        ----------
+        key : list-like
+            Targeted labels (only used to show correct error message).
+        indexer: array-like of booleans
+            Indices corresponding to the key,
+            (with -1 indicating not found).
+        axis_name : str
+    
+        Raises
+        ------
+        KeyError
+            If at least one key was requested but none was found.
+        """
+        if len(key) == 0:
+            return
+    
+        # Count missing values
+        missing_mask = indexer &lt; 0
+        nmissing = missing_mask.sum()
+    
+        if nmissing:
+            # TODO: remove special-case; this is just to keep exception
+            #  message tests from raising while debugging
+            use_interval_msg = isinstance(self.dtype, IntervalDtype) or (
+                isinstance(self.dtype, CategoricalDtype)
+                # "Index" has no attribute "categories"  [attr-defined]
+                and isinstance(
+                    self.categories.dtype, IntervalDtype  # type: ignore[attr-defined]
+                )
+            )
+    
+            if nmissing == len(indexer):
+                if use_interval_msg:
+                    key = list(key)
+&gt;               raise KeyError(f"None of [{key}] are in the [{axis_name}]")
+E               KeyError: "None of [Index(['ds', 'temp_avg'], dtype='object')] are in the [columns]"
+
+../../Library/Python/3.9/lib/python/site-packages/pandas/core/indexes/base.py:6176: KeyError</failure></testcase><testcase classname="tests.test_forecast.TestBasicFunctionality" name="test_imports_work" time="0.001" /><testcase classname="tests.test_forecast.TestBasicFunctionality" name="test_dataframe_creation" time="0.001" /><testcase classname="tests.test_forecast.TestBasicFunctionality" name="test_mock_classes_work" time="0.001" /></testsuite></testsuites>
