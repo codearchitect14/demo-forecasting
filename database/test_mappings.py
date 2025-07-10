@@ -4,9 +4,16 @@ Script to test the mappings with sample data from the database.
 
 import os
 import json
-import pandas as pd
-from sqlalchemy import create_engine
-from mappings import (
+import pandas as pd  # type: ignore
+import numpy as np  # type: ignore
+from typing import Dict, List, Optional, Any
+from datetime import datetime, timedelta
+import logging
+import sys
+from pathlib import Path
+import sqlalchemy  # type: ignore
+from sqlalchemy import create_engine  # type: ignore
+from database.mappings import (
     CITY_MAPPINGS,
     MANAGEMENT_GROUP_MAPPINGS,
     FIRST_CATEGORY_MAPPINGS,

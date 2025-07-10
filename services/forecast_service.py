@@ -1,4 +1,4 @@
-import asyncpg
+import asyncpg  # type: ignore
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import pandas as pd

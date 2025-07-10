@@ -2,17 +2,26 @@
 Script to export FreshRetailNet-50K data from Hugging Face to various formats.
 """
 
+import pandas as pd  # type: ignore
+import numpy as np  # type: ignore
+from typing import Dict, List, Optional, Any
+from datetime import datetime, timedelta
+import logging
 import os
 import sys
-import argparse
 from pathlib import Path
-import pandas as pd
-import numpy as np
-from datasets import load_dataset
+import argparse
 from tqdm import tqdm
 
-# Add project root to path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+# Add the project root to the Python path
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root))
+
+try:
+    from datasets import load_dataset  # type: ignore
+except ImportError:
+    print("Warning: datasets library not available. Using fallback data loading.")
+    load_dataset = None
 
 # Import custom modules (if available)
 try:

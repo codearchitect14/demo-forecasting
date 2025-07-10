@@ -4,8 +4,8 @@ FastAPI endpoints for sales forecasting and demand prediction.
 
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union, Any
-import pandas as pd
-import numpy as np
+import pandas as pd  # type: ignore
+import numpy as np  # type: ignore
 from fastapi import FastAPI, Query, HTTPException, Depends
 from pydantic import BaseModel, Field
 import logging
@@ -16,7 +16,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.prophet_forecaster import ProphetForecaster
 from models.promo_uplift_model import PromoUpliftModel
-from database.connection import get_db_engine
+from database.connection import get_db_engine, get_supabase_client  # type: ignore
 
 # Configure logging
 logging.basicConfig(
@@ -133,12 +133,12 @@ def get_promo_model():
 
 
 def fetch_historical_data(
-    store_id=None,
-    product_id=None,
-    category_id=None,
-    city_id=None,
-    start_date=None,
-    end_date=None,
+    store_id: Optional[int] = None,
+    product_id: Optional[int] = None,
+    category_id: Optional[int] = None,
+    city_id: Optional[int] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
 ):
     """
     Fetch historical sales data from the database.
@@ -172,19 +172,19 @@ def fetch_historical_data(
 
     if store_id is not None:
         query += " AND sd.store_id = :store_id"
-        params["store_id"] = store_id
+        params["store_id"] = int(store_id)
 
     if product_id is not None:
         query += " AND sd.product_id = :product_id"
-        params["product_id"] = product_id
+        params["product_id"] = int(product_id)
 
     if category_id is not None:
         query += " AND ph.first_category_id = :category_id"
-        params["category_id"] = category_id
+        params["category_id"] = int(category_id)
 
     if city_id is not None:
         query += " AND sh.city_id = :city_id"
-        params["city_id"] = city_id
+        params["city_id"] = int(city_id)
 
     if start_date is not None:
         query += " AND sd.sale_date >= :start_date"
@@ -205,7 +205,7 @@ def fetch_historical_data(
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
-def fetch_weather_data(city_id=None, start_date=None, end_date=None, future_periods=0):
+def fetch_weather_data(city_id: Optional[int] = None, start_date: Optional[str] = None, end_date: Optional[str] = None, future_periods: int = 0):
     """
     Fetch weather data from the database, including future forecasts if available.
 
@@ -238,7 +238,7 @@ def fetch_weather_data(city_id=None, start_date=None, end_date=None, future_peri
 
     if city_id is not None:
         query += " AND city_id = :city_id"
-        params["city_id"] = city_id
+        params["city_id"] = int(city_id)
 
     if start_date is not None:
         query += " AND date >= :start_date"
@@ -290,12 +290,12 @@ def fetch_weather_data(city_id=None, start_date=None, end_date=None, future_peri
 
 
 def fetch_promotion_data(
-    store_id=None,
-    product_id=None,
-    category_id=None,
-    start_date=None,
-    end_date=None,
-    future_periods=0,
+    store_id: Optional[int] = None,
+    product_id: Optional[int] = None,
+    category_id: Optional[int] = None,
+    start_date: Optional[str] = None,
+    end_date: Optional[str] = None,
+    future_periods: int = 0,
 ):
     """
     Fetch promotion data from the database, including future planned promotions.
@@ -323,15 +323,15 @@ def fetch_promotion_data(
 
     if store_id is not None:
         query += " AND pe.store_id = :store_id"
-        params["store_id"] = store_id
+        params["store_id"] = int(store_id)
 
     if product_id is not None:
         query += " AND pe.product_id = :product_id"
-        params["product_id"] = product_id
+        params["product_id"] = int(product_id)
 
     if category_id is not None:
         query += " AND ph.first_category_id = :category_id"
-        params["category_id"] = category_id
+        params["category_id"] = int(category_id)
 
     # Handle date range for promotions
     if start_date is not None and end_date is not None:
@@ -360,7 +360,7 @@ def fetch_promotion_data(
         raise HTTPException(status_code=500, detail=f"Promotion data error: {str(e)}")
 
 
-def fetch_holiday_data(start_date=None, end_date=None, future_periods=0):
+def fetch_holiday_data(start_date: Optional[str] = None, end_date: Optional[str] = None, future_periods: int = 0):
     """
     Fetch holiday data from the database.
 
@@ -445,17 +445,15 @@ def create_forecast(
         else:
             end_date = start_date + timedelta(days=request.periods)
 
-        # Get historical data for training
-        hist_start_date = start_date - timedelta(
-            days=365
-        )  # Use 1 year of history for training
+        # Get historical data for training (1 year back from start date)
+        hist_start_date = start_date - timedelta(days=365)
         df = fetch_historical_data(
             store_id=request.store_id,
             product_id=request.product_id,
             category_id=request.category_id,
             city_id=request.city_id,
-            start_date=hist_start_date,
-            end_date=start_date - timedelta(days=1),
+            start_date=hist_start_date.strftime("%Y-%m-%d"),
+            end_date=(start_date - timedelta(days=1)).strftime("%Y-%m-%d"),
         )
 
         if len(df) < 30:
@@ -464,7 +462,7 @@ def create_forecast(
             )
 
         # Configure the model
-        model.include_holiday = request.include_holidays
+        model.include_holidays = request.include_holidays
         model.include_weather = request.include_weather
         model.include_promotions = request.include_promotions
         model.forecast_periods = request.periods
@@ -482,8 +480,8 @@ def create_forecast(
         if request.include_weather and request.city_id is not None:
             weather_data = fetch_weather_data(
                 city_id=request.city_id,
-                start_date=start_date,
-                end_date=end_date,
+                start_date=start_date.strftime("%Y-%m-%d"),
+                end_date=end_date.strftime("%Y-%m-%d"),
                 future_periods=request.periods,
             )
             if not weather_data.empty:
@@ -503,8 +501,8 @@ def create_forecast(
                 store_id=request.store_id,
                 product_id=request.product_id,
                 category_id=request.category_id,
-                start_date=start_date,
-                end_date=end_date,
+                start_date=start_date.strftime("%Y-%m-%d"),
+                end_date=end_date.strftime("%Y-%m-%d"),
             )
             if not promo_data.empty:
                 # Create daily flags for promotions
@@ -571,12 +569,12 @@ def create_forecast(
 
         response = {
             "forecast": forecast_data.to_dict(orient="records"),
-            "metrics": model.metrics.to_dict() if model.metrics is not None else None,
+            "metrics": model.metrics if isinstance(model.metrics, dict) else (model.metrics.to_dict() if hasattr(model.metrics, 'to_dict') and model.metrics is not None else None),
         }
 
         # Add components if requested
         if request.return_components:
-            components = model.get_forecast_components()
+            components = model.get_forecast_components(forecast)
             component_dict = {}
 
             for component_name, component_data in components.items():
@@ -621,14 +619,15 @@ def analyze_promotion(
         start_date = pd.to_datetime(request.start_date)
         end_date = pd.to_datetime(request.end_date)
 
-        # Get historical data
+        # Get historical data for training (1 year back from start date)
+        hist_start_date = start_date - timedelta(days=365)
         df = fetch_historical_data(
             store_id=request.store_id,
             product_id=request.product_id,
             category_id=request.category_id,
             city_id=request.city_id,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=hist_start_date.strftime("%Y-%m-%d"),
+            end_date=(start_date - timedelta(days=1)).strftime("%Y-%m-%d"),
         )
 
         if len(df) == 0:
@@ -641,8 +640,8 @@ def analyze_promotion(
             store_id=request.store_id,
             product_id=request.product_id,
             category_id=request.category_id,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=start_date.strftime("%Y-%m-%d"),
+            end_date=end_date.strftime("%Y-%m-%d"),
         )
 
         # Merge promotion details if available
@@ -737,9 +736,9 @@ def analyze_stockout(request: StockoutAnalysisRequest):
         df = fetch_historical_data(
             store_id=request.store_id,
             product_id=request.product_id,
-            start_date=start_date
+            start_date=start_date.strftime("%Y-%m-%d")
             - timedelta(days=30),  # Get some extra history for better estimation
-            end_date=end_date,
+            end_date=end_date.strftime("%Y-%m-%d"),
         )
 
         if len(df) == 0:
@@ -837,8 +836,8 @@ def analyze_holiday_impact(request: HolidayImpactRequest):
         df = fetch_historical_data(
             product_id=request.product_id,
             category_id=request.category_id,
-            start_date=start_date,
-            end_date=end_date,
+            start_date=start_date.strftime("%Y-%m-%d"),
+            end_date=end_date.strftime("%Y-%m-%d"),
         )
 
         if len(df) == 0:
@@ -847,7 +846,7 @@ def analyze_holiday_impact(request: HolidayImpactRequest):
             )
 
         # Get holiday data
-        holidays_df = fetch_holiday_data(start_date=start_date, end_date=end_date)
+        holidays_df = fetch_holiday_data(start_date=start_date.strftime("%Y-%m-%d"), end_date=end_date.strftime("%Y-%m-%d"))
 
         # Filter by holiday name if specified
         if request.holiday_name is not None:

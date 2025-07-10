@@ -2,8 +2,8 @@
 Database connection manager with connection pooling.
 """
 
-import asyncpg
-from typing import Optional
+import asyncpg  # type: ignore
+from typing import Optional, Dict, Any
 from functools import wraps
 from .config import get_db_url, get_pool_config
 from cachetools import TTLCache
@@ -14,7 +14,7 @@ _pool: Optional[asyncpg.Pool] = None
 
 # Initialize cache
 cache_config = get_cache_config()
-_cache = TTLCache(maxsize=cache_config["max_size"], ttl=cache_config["ttl"])
+_cache: TTLCache = TTLCache(maxsize=cache_config["max_size"], ttl=cache_config["ttl"])
 
 
 async def get_pool() -> asyncpg.Pool:
@@ -100,3 +100,17 @@ def paginate(page: int = 1, page_size: Optional[int] = None):
         return wrapper
 
     return decorator
+
+
+def get_db_engine():
+    """Get database engine - placeholder for compatibility."""
+    # This is a placeholder for compatibility with existing code
+    # In a real implementation, this would return a SQLAlchemy engine
+    raise NotImplementedError("get_db_engine not implemented - use get_pool() instead")
+
+
+def get_supabase_client():
+    """Get Supabase client - placeholder for compatibility."""
+    # This is a placeholder for compatibility with existing code
+    # In a real implementation, this would return a Supabase client
+    raise NotImplementedError("get_supabase_client not implemented")

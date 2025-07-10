@@ -2,10 +2,16 @@
 Script to run SQL queries and explore the FreshRetailNet-50K dataset.
 """
 
+import pandas as pd  # type: ignore
+import numpy as np  # type: ignore
+from typing import Dict, List, Optional, Any
+from datetime import datetime, timedelta
+import logging
 import os
+import sys
 from pathlib import Path
-import pandas as pd
-from sqlalchemy import create_engine, text
+import sqlalchemy  # type: ignore
+from sqlalchemy import create_engine, text  # type: ignore
 from dotenv import load_dotenv
 
 # Load environment variables

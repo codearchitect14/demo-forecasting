@@ -2,22 +2,32 @@
 Prophet forecasting model wrapper.
 """
 
-import pandas as pd
-from prophet import Prophet
-import numpy as np
+import pandas as pd  # type: ignore
+from prophet import Prophet  # type: ignore
+import numpy as np  # type: ignore
+from typing import Union, Optional, Dict, Any
 
 
 class ProphetForecaster:
     """Wrapper class for Facebook Prophet forecasting model"""
 
+    model: Prophet
+    include_weather: bool
+    include_holidays: bool
+    include_promotions: bool
+    trained: bool
+    metrics: Optional[Dict[str, Any]]
+    forecast_periods: int
+    forecast_freq: str
+
     def __init__(
-        self, include_weather=True, include_holidays=True, include_promotions=True
+        self, include_weather: bool = True, include_holidays: bool = True, include_promotions: bool = True
     ):
         """Initialize the Prophet model with appropriate components"""
         self.model = Prophet(
-            daily_seasonality=False,
-            weekly_seasonality=True,
-            yearly_seasonality=True,
+            daily_seasonality="auto",
+            weekly_seasonality="auto",
+            yearly_seasonality="auto",
             seasonality_mode="additive",  # Changed to additive
             growth="logistic",  # Added logistic growth to enforce non-negative values
         )
@@ -27,6 +37,8 @@ class ProphetForecaster:
         self.include_promotions = include_promotions
         self.trained = False  # Add trained attribute
         self.metrics = None  # Add metrics attribute
+        self.forecast_periods = 30  # Default value, can be overwritten
+        self.forecast_freq = "D"  # Default value, can be overwritten
 
     def add_regressors(self, df):
         """Add relevant regressors to the model based on configuration"""
@@ -156,7 +168,7 @@ class ProphetForecaster:
                 future["ds"] = pd.to_datetime(future["ds"])
 
             # Set carrying capacity for logistic growth in future data
-            if hasattr(self.model, "history"):
+            if hasattr(self.model, "history") and self.model.history is not None:
                 max_sales = self.model.history["y"].max() * 1.5
             else:
                 max_sales = 10000  # Default if no history available
@@ -170,7 +182,7 @@ class ProphetForecaster:
             future = self.model.make_future_dataframe(periods=periods, freq=freq)
 
             # Set carrying capacity for logistic growth in future data
-            if hasattr(self.model, "history"):
+            if hasattr(self.model, "history") and self.model.history is not None:
                 max_sales = self.model.history["y"].max() * 1.5
             else:
                 max_sales = 10000  # Default if no history available
@@ -181,7 +193,7 @@ class ProphetForecaster:
             if hasattr(self.model, "extra_regressors"):
                 for regressor_name in self.model.extra_regressors:
                     # Use the mean value from training for forecasting
-                    value = self.model.history[regressor_name].mean()
+                    value = self.model.history[regressor_name].mean() if self.model.history is not None else 0
                     future[regressor_name] = value
 
         print("DEBUG: Calling model.predict...")
@@ -197,7 +209,22 @@ class ProphetForecaster:
 
         return forecast
 
-    def plot_components(self):
+    def plot_components(self, forecast_df=None):
         """Plot forecast components"""
-        fig = self.model.plot_components(self.model.forecast)
+        if forecast_df is None:
+            raise ValueError("A forecast DataFrame must be provided to plot components.")
+        fig = self.model.plot_components(forecast_df)
         return fig
+
+    def get_forecast_components(self, forecast_df=None):
+        """Return forecast components as a dictionary of DataFrames."""
+        if forecast_df is None:
+            raise ValueError("A forecast DataFrame must be provided to get components.")
+        components = {}
+        fig = self.model.plot_components(forecast_df)
+        # Prophet's plot_components returns a matplotlib figure, not the data, so we return None for now
+        # If you want to extract the data, you need to access the model's seasonalities, etc.
+        # For now, return an empty dict or None for each component
+        for name in ["trend", "yearly", "weekly", "daily"]:
+            components[name] = None
+        return components

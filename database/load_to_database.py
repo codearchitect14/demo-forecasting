@@ -3,13 +3,24 @@ Script to load the FreshRetailNet-50K dataset from Hugging Face to any PostgreSQ
 This is a more flexible version that can work with any PostgreSQL connection.
 """
 
+import pandas as pd  # type: ignore
+import numpy as np  # type: ignore
+from typing import Dict, List, Optional, Any
+from datetime import datetime, timedelta
+import logging
 import os
 import sys
 import argparse
-import pandas as pd
 from pathlib import Path
-from datasets import load_dataset
-from sqlalchemy import create_engine, text
+
+try:
+    from datasets import load_dataset  # type: ignore
+except ImportError:
+    print("Warning: datasets library not available. Using fallback data loading.")
+    load_dataset = None
+
+import sqlalchemy  # type: ignore
+from sqlalchemy import create_engine, text  # type: ignore
 from dotenv import load_dotenv
 
 # Add project root to Python path
