@@ -2,12 +2,15 @@
 Promotion uplift model for estimating promotion effectiveness.
 """
 
-import numpy as np
-import pandas as pd
-from sklearn.ensemble import RandomForestRegressor
-from sklearn.model_selection import train_test_split
-from sklearn.metrics import mean_squared_error, r2_score
-from sklearn.preprocessing import StandardScaler
+import pandas as pd  # type: ignore
+import numpy as np  # type: ignore
+from typing import Dict, List, Optional, Any, Tuple
+from datetime import datetime, timedelta
+import logging
+from sklearn.ensemble import RandomForestRegressor  # type: ignore
+from sklearn.model_selection import train_test_split  # type: ignore
+from sklearn.metrics import mean_squared_error, r2_score  # type: ignore
+from sklearn.preprocessing import StandardScaler  # type: ignore
 
 
 class PromoUpliftModel:

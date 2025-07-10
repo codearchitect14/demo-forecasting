@@ -3,12 +3,16 @@ Data preprocessing module for the FreshRetailNet-50K dataset.
 Handles feature engineering, missing values, outliers, and normalization.
 """
 
-import numpy as np
-import pandas as pd
-from sklearn.preprocessing import StandardScaler
+import pandas as pd  # type: ignore
+import numpy as np  # type: ignore
+from typing import Dict, List, Optional, Any, Tuple
+from datetime import datetime, timedelta
+import logging
+from sklearn.preprocessing import StandardScaler  # type: ignore
+from sklearn.impute import SimpleImputer  # type: ignore
 import json
 from pathlib import Path
-import joblib
+import joblib  # type: ignore
 
 
 class DataPreprocessor:

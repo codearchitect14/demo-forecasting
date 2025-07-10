@@ -7,11 +7,11 @@ import sys
 import time
 import json
 from pathlib import Path
-import pandas as pd
-import numpy as np
+import pandas as pd  # type: ignore
+import numpy as np  # type: ignore
 from tqdm import tqdm
 from dotenv import load_dotenv
-from datasets import load_dataset
+from datasets import load_dataset  # type: ignore
 import requests
 
 # Add project root to path

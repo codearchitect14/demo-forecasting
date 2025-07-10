@@ -6,6 +6,7 @@ import os
 from datetime import datetime, timedelta, date
 from typing import List, Dict, Any, Optional
 
+import asyncpg
 from fastapi import FastAPI, HTTPException, Query, Depends, Path
 from fastapi.middleware.cors import CORSMiddleware
 from models.forecast_models import (
@@ -25,7 +26,6 @@ from services.forecast_service import (
     analyze_holiday_impact,
 )
 from services.model_loader import get_forecast_model, get_promo_model
-import asyncpg
 import traceback
 
 # Create FastAPI app
@@ -59,6 +59,33 @@ async def get_db_connection():
 async def root():
     """Root endpoint"""
     return {"status": "ok", "message": "FreshRetail Forecasting API is running"}
+
+
+@app.get("/cities")
+async def get_cities(conn=Depends(get_db_connection)):
+    rows = await conn.fetch(
+        "SELECT city_id, city_name FROM city_hierarchy ORDER BY city_name"
+    )
+    await conn.close()
+    return [dict(row) for row in rows]
+
+
+@app.get("/stores")
+async def get_stores(conn=Depends(get_db_connection)):
+    rows = await conn.fetch(
+        "SELECT s.store_id, s.store_name, s.city_id, c.city_name FROM store_hierarchy s LEFT JOIN city_hierarchy c ON s.city_id = c.city_id ORDER BY s.store_name"
+    )
+    await conn.close()
+    return [dict(row) for row in rows]
+
+
+@app.get("/products")
+async def get_products(conn=Depends(get_db_connection)):
+    rows = await conn.fetch(
+        "SELECT product_id, product_name FROM product_hierarchy ORDER BY product_name"
+    )
+    await conn.close()
+    return [dict(row) for row in rows]
 
 
 @app.post("/api/forecast", response_model=ForecastResponse)
@@ -446,6 +473,26 @@ async def stockout_risk_get(
         )
     finally:
         await conn.close()
+
+
+@app.get("/valid-combinations")
+async def get_valid_combinations(conn=Depends(get_db_connection)):
+    query = """
+    SELECT DISTINCT 
+        sh.city_id, 
+        ch.city_name, 
+        sh.store_id, 
+        sh.store_name, 
+        ph.product_id, 
+        ph.product_name
+    FROM sales_data sd
+    JOIN store_hierarchy sh ON sd.store_id = sh.store_id
+    JOIN product_hierarchy ph ON sd.product_id = ph.product_id
+    LEFT JOIN city_hierarchy ch ON sh.city_id = ch.city_id
+    """
+    rows = await conn.fetch(query)
+    await conn.close()
+    return [dict(row) for row in rows]
 
 
 @app.get("/debug/data")

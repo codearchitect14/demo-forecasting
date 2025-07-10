@@ -1,4 +1,4 @@
-import asyncpg
+import asyncpg  # type: ignore
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import pandas as pd
@@ -241,7 +241,7 @@ async def fetch_historical_data(
 ) -> pd.DataFrame:
     """
     Async fetch historical sales data from the database using asyncpg.
-    Ensures all required columns are present in the DataFrame, including store_id, product_id, sale_date, category_id, city_id.
+    Ensures all required columns are present in the DataFrame.
     """
     # Convert date strings to datetime.date objects for asyncpg
     if start_date is not None and isinstance(start_date, str):
@@ -255,24 +255,22 @@ async def fetch_historical_data(
 
     query = """
     SELECT 
-        sd.sale_date,
+        sd.dt as sale_date,
         sd.store_id,
         sd.product_id,
-        ph.first_category_id AS category_id,
-        sh.city_id,
+        sd.first_category_id AS category_id,
+        sd.city_id,
         sd.sale_amount,
-        sd.sale_qty,
         sd.discount,
-        sd.original_price,
         sd.stock_hour6_22_cnt,
-        sd.stock_hour6_14_cnt,
-        sd.stock_hour14_22_cnt,
         sd.holiday_flag,
-        sd.promo_flag,
+        sd.activity_flag as promo_flag,
+        sd.precpt,
+        sd.avg_temperature,
+        sd.avg_humidity,
+        sd.avg_wind_level,
         sd.created_at
     FROM sales_data sd
-    JOIN store_hierarchy sh ON sd.store_id = sh.store_id
-    JOIN product_hierarchy ph ON sd.product_id = ph.product_id
     WHERE 1=1
     """
     params = []
@@ -286,28 +284,29 @@ async def fetch_historical_data(
         params.append(product_id)
         idx += 1
     if category_id is not None:
-        query += f" AND ph.first_category_id = ${idx}"
+        query += f" AND sd.first_category_id = ${idx}"
         params.append(category_id)
         idx += 1
     if city_id is not None:
-        query += f" AND sh.city_id = ${idx}"
+        query += f" AND sd.city_id = ${idx}"
         params.append(city_id)
         idx += 1
     if start_date is not None:
-        query += f" AND sd.sale_date >= ${idx}"
+        query += f" AND sd.dt >= ${idx}"
         params.append(start_date)
         idx += 1
     if end_date is not None:
-        query += f" AND sd.sale_date <= ${idx}"
+        query += f" AND sd.dt <= ${idx}"
         params.append(end_date)
         idx += 1
-    query += " ORDER BY sd.sale_date"
+    query += " ORDER BY sd.dt"
     records = await conn.fetch(query, *params)
     df = (
         pd.DataFrame(records, columns=[k for k in records[0].keys()])
         if records
         else pd.DataFrame()
     )
+
     # Ensure all required columns are present
     required_cols = [
         "store_id",
@@ -316,26 +315,34 @@ async def fetch_historical_data(
         "sale_amount",
         "promo_flag",
         "stock_hour6_22_cnt",
-        "sale_qty",
         "discount",
-        "original_price",
-        "stock_hour6_14_cnt",
-        "stock_hour14_22_cnt",
         "holiday_flag",
         "created_at",
         "category_id",
         "city_id",
+        "precpt",
+        "avg_temperature",
+        "avg_humidity",
+        "avg_wind_level",
     ]
     for col in required_cols:
         if col not in df.columns:
-            if col == "promo_flag":
+            if col in ["promo_flag", "holiday_flag"]:
                 df[col] = False
-            elif col in ["sale_amount", "original_price", "discount"]:
+            elif col in [
+                "sale_amount",
+                "discount",
+                "precpt",
+                "avg_temperature",
+                "avg_humidity",
+            ]:
                 df[col] = 0.0
             elif col == "created_at":
                 from datetime import datetime
 
                 df[col] = datetime.now()
+            elif col == "avg_wind_level":
+                df[col] = 0
             elif col in ["sale_date", "category_id", "city_id"]:
                 df[col] = None
             else:

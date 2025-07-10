@@ -110,8 +110,8 @@ class PromotionRepository:
         List promotions with optional filters.
         Returns a list of promotion records.
         """
-        filters = []
-        values = []
+        filters: List[str] = []
+        values: List[Any] = []
         idx = 1
         join_category = False
         if store_id is not None:
@@ -137,7 +137,7 @@ class PromotionRepository:
             idx += 1
         if active:
             filters.append(f"pe.start_date <= ${idx} AND pe.end_date >= ${idx+1}")
-            now = datetime.now().date()
+            now = datetime.now()
             values.append(now)
             values.append(now)
             idx += 2

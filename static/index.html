@@ -226,6 +226,51 @@
     <script src="/static/lib/bootstrap.bundle.min.js"></script>
     <script src="/static/lib/chart.min.js"></script>
     <script>
+        // Dynamically populate city, store, and product dropdowns from API
+        document.addEventListener('DOMContentLoaded', function() {
+            // Populate City Dropdown
+            fetch('/api/cities')
+              .then(res => res.json())
+              .then(cities => {
+                const citySelect = document.getElementById('citySelect');
+                citySelect.innerHTML = '<option value="" disabled selected>Select city</option>';
+                cities.forEach(city => {
+                  const option = document.createElement('option');
+                  option.value = city.city_id;
+                  option.text = city.city_name;
+                  citySelect.appendChild(option);
+                });
+              });
+
+            // Populate Store Dropdown
+            fetch('/api/stores')
+              .then(res => res.json())
+              .then(stores => {
+                const storeSelect = document.getElementById('storeSelect');
+                storeSelect.innerHTML = '<option value="" disabled selected>Select store</option>';
+                stores.forEach(store => {
+                  const option = document.createElement('option');
+                  option.value = store.store_id;
+                  option.text = `${store.store_name} (${store.city_name || 'Unknown City'})`;
+                  storeSelect.appendChild(option);
+                });
+              });
+
+            // Populate Product Dropdown
+            fetch('/api/products')
+              .then(res => res.json())
+              .then(products => {
+                const productSelect = document.getElementById('productSelect');
+                productSelect.innerHTML = '<option value="" disabled selected>Select product</option>';
+                products.forEach(product => {
+                  const option = document.createElement('option');
+                  option.value = product.product_id;
+                  option.text = product.product_name;
+                  productSelect.appendChild(option);
+                });
+              });
+        });
+
         // Check if Bootstrap is loaded
         if (typeof bootstrap === 'undefined') {
             console.warn('DEBUG: Bootstrap is not loaded. Some UI features may not work properly.');
@@ -375,16 +420,21 @@
                 // Update UI functions
         function updateForecastUI(data) {
             console.log('DEBUG: Updating forecast UI with data:', data);
+            // Defensive check for valid forecast data
+            if (!data || !Array.isArray(data.forecasted_values)) {
+                document.getElementById('forecast-summary').textContent = "No forecast data available for this selection.";
+                // Optionally clear chart
+                if (forecastChart) { forecastChart.destroy(); forecastChart = null; }
+                return;
+            }
             
             // Update summary
             const storeName = document.getElementById('storeSelect').options[document.getElementById('storeSelect').selectedIndex].text;
             const productName = document.getElementById('productSelect').options[document.getElementById('productSelect').selectedIndex].text;
             
-            // Calculate some statistics
-            const values = data.forecasted_values;
-            console.log('DEBUG: Forecast values:', values);
-            const totalSales = values.reduce((sum, val) => sum + val, 0).toFixed(2);
-            const avgSales = (values.reduce((sum, val) => sum + val, 0) / values.length).toFixed(2);
+            // Calculate statistics from forecasted_values array
+            const totalSales = data.forecasted_values.reduce((sum, val) => sum + val, 0).toFixed(2);
+            const avgSales = (data.forecasted_values.reduce((sum, val) => sum + val, 0) / data.forecasted_values.length).toFixed(2);
             
             document.getElementById('forecast-summary').textContent = 
                 `Forecast for ${productName} at ${storeName}: Total sales of ${totalSales} units with daily average of ${avgSales} units.`;

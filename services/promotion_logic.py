@@ -1,14 +1,14 @@
 from typing import List, Dict, Any, Optional
 from datetime import datetime, timedelta
-import pandas as pd
-import logging
+import pandas as pd  # type: ignore
+import logging  # type: ignore
 
 logger = logging.getLogger(__name__)
 
 
 def simulate_and_recommend_promotions(
     df: pd.DataFrame,
-    model,
+    model: Any,  # Add type annotation for model
     group_cols: List[str],
     max_discount: float = 0.5,
     count: int = 10,
@@ -27,16 +27,19 @@ def simulate_and_recommend_promotions(
         return {"recommendations": [], "summary": {}}
 
     combinations = df[group_cols].drop_duplicates()
+    if combinations is None:
+        return {"recommendations": [], "summary": {}}
 
     for _, combo in combinations.iterrows():
-        combo_filter = True
+        # Create a boolean mask for filtering
+        mask = pd.Series([True] * len(df), index=df.index)
         for col in group_cols:
-            combo_filter = combo_filter & (df[col] == combo[col])
-        combo_data = df[combo_filter].copy()
-        if len(combo_data) < 10:
+            mask = mask & (df[col] == combo[col])
+        combo_data = df[mask].copy()
+        if combo_data.shape[0] < 10:
             continue
         baseline = (
-            combo_data[~combo_data["promo_flag"]]["sale_amount"].mean()
+            combo_data[combo_data["promo_flag"] == False]["sale_amount"].mean()
             if "promo_flag" in combo_data.columns
             else combo_data["sale_amount"].mean()
         )
@@ -45,14 +48,26 @@ def simulate_and_recommend_promotions(
             sim_data["discount"] = discount
             sim_data["promo_flag"] = True
             try:
-                pred_uplift = model.predict(sim_data).mean()
+                pred_uplift_result = model.predict(sim_data)
+                # Handle different return types from model.predict with proper type checking
+                if hasattr(pred_uplift_result, "mean"):
+                    pred_uplift = float(pred_uplift_result.mean())
+                elif hasattr(pred_uplift_result, "__iter__") and not isinstance(
+                    pred_uplift_result, (str, bytes)
+                ):
+                    pred_uplift = float(
+                        sum(pred_uplift_result) / len(pred_uplift_result)
+                    )
+                else:
+                    pred_uplift = float(pred_uplift_result)
+
                 if pred_uplift <= 0:
                     continue
-                discount_cost = baseline * discount
+                discount_cost = float(baseline) * discount
                 roi = (
                     (pred_uplift - discount_cost) / discount_cost
                     if discount_cost > 0
-                    else 0
+                    else 0.0
                 )
                 rec = {
                     "discount_percentage": float(discount),
@@ -63,39 +78,44 @@ def simulate_and_recommend_promotions(
                     "promotion_type": "Discount",
                 }
                 for col in group_cols:
-                    rec[col] = int(combo[col]) if pd.notnull(combo[col]) else None
+                    value = combo[col]
+                    if isinstance(value, (int, float, str)) and pd.notna(value):
+                        try:
+                            rec[col] = int(float(value))
+                        except Exception:
+                            rec[col] = None
+                    else:
+                        rec[col] = None
                 recommendations.append(rec)
             except Exception as e:
                 logger.warning(
                     f"Error predicting uplift for {combo}: {str(e)}", exc_info=True
                 )
 
-    recommendations.sort(key=lambda x: x["estimated_roi"], reverse=True)
+    recommendations.sort(key=lambda x: float(x["estimated_roi"]), reverse=True)
     top_recommendations = recommendations[:count]
     if target_uplift is not None:
         top_recommendations = [
             rec
             for rec in top_recommendations
-            if rec["estimated_uplift"] >= target_uplift
+            if float(rec["estimated_uplift"]) >= float(target_uplift)
         ]
-    avg_uplift = (
-        sum(rec["estimated_uplift"] for rec in top_recommendations)
-        / len(top_recommendations)
-        if top_recommendations
-        else 0
-    )
-    avg_roi = (
-        sum(rec["estimated_roi"] for rec in top_recommendations)
-        / len(top_recommendations)
-        if top_recommendations
-        else 0
-    )
-    avg_discount = (
-        sum(rec["discount_percentage"] for rec in top_recommendations)
-        / len(top_recommendations)
-        if top_recommendations
-        else 0
-    )
+
+    # Calculate averages with proper type handling
+    if top_recommendations:
+        avg_uplift = sum(
+            float(rec["estimated_uplift"]) for rec in top_recommendations
+        ) / len(top_recommendations)
+        avg_roi = sum(float(rec["estimated_roi"]) for rec in top_recommendations) / len(
+            top_recommendations
+        )
+        avg_discount = sum(
+            float(rec["discount_percentage"]) for rec in top_recommendations
+        ) / len(top_recommendations)
+    else:
+        avg_uplift = 0.0
+        avg_roi = 0.0
+        avg_discount = 0.0
     return {
         "recommendations": top_recommendations,
         "summary": {

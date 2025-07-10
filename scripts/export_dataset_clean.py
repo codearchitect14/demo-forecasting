@@ -2,17 +2,27 @@
 Script to export FreshRetailNet-50K data with exactly matching table columns.
 """
 
+import pandas as pd  # type: ignore
+import numpy as np  # type: ignore
+from typing import Dict, List, Optional, Any
+from datetime import datetime, timedelta
+import logging
 import os
 import sys
-import argparse
 from pathlib import Path
-import pandas as pd
-import numpy as np
-from tqdm import tqdm
-from datasets import load_dataset
 
-# Add project root to path
-sys.path.append(str(Path(__file__).resolve().parent.parent))
+# Add the project root to the Python path
+project_root = Path(__file__).parent.parent
+sys.path.append(str(project_root))
+
+from database.connection import get_db_engine
+from services.data_preprocessor import DataPreprocessor
+
+try:
+    from datasets import load_dataset  # type: ignore
+except ImportError:
+    print("Warning: datasets library not available. Using fallback data loading.")
+    load_dataset = None
 
 
 def load_data(limit=None, offset=0):

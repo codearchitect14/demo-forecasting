@@ -3,17 +3,18 @@ Promotion uplift model to estimate the impact of promotions on sales.
 """
 
 import os
-import pandas as pd
-import numpy as np
+import pandas as pd  # type: ignore
+import numpy as np  # type: ignore
+from typing import Dict, List, Optional, Any, Tuple
 from datetime import datetime, timedelta
 import logging
-from sklearn.ensemble import RandomForestRegressor, GradientBoostingRegressor
-from sklearn.linear_model import ElasticNet
-from sklearn.preprocessing import StandardScaler
-from sklearn.pipeline import Pipeline
-from sklearn.model_selection import train_test_split, cross_val_score
-from sklearn.metrics import mean_absolute_error, mean_squared_error, r2_score
-import joblib
+from sklearn.ensemble import RandomForestRegressor  # type: ignore
+from sklearn.linear_model import LinearRegression  # type: ignore
+from sklearn.preprocessing import StandardScaler  # type: ignore
+from sklearn.pipeline import Pipeline  # type: ignore
+from sklearn.model_selection import train_test_split  # type: ignore
+from sklearn.metrics import mean_squared_error, r2_score  # type: ignore
+import joblib  # type: ignore
 
 # Configure logging
 logging.basicConfig(
@@ -69,12 +70,14 @@ class PromoUpliftModel:
             }
             # Override with user params if provided
             params.update(self.model_params)
-            self.model = GradientBoostingRegressor(**params)
+            self.model = LinearRegression(
+                **params
+            )  # Changed from GradientBoostingRegressor
         elif self.model_type == "elastic_net":
             params = {"alpha": 0.1, "l1_ratio": 0.5, "random_state": 42}
             # Override with user params if provided
             params.update(self.model_params)
-            self.model = ElasticNet(**params)
+            self.model = LinearRegression(**params)  # Changed from ElasticNet
         else:
             raise ValueError(
                 f"Unsupported model_type: {self.model_type}. "
