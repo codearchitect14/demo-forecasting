@@ -23,5 +23,5 @@ pipelines:
           - step:
               name: Code Formatter (Black Check)
               script:
-                - pip install black
+                - pip install -r requirements.txt
                 - black . --check
