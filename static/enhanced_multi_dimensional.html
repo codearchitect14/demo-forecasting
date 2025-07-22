@@ -15,6 +15,9 @@
     <!-- Chart.js -->
     <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/chartjs-adapter-date-fns/dist/chartjs-adapter-date-fns.bundle.min.js"></script>
+    <!-- Chart.js Plugins for advanced interactivity -->
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-crosshair@3.0.0/dist/chartjs-plugin-crosshair.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/chartjs-plugin-zoom@2.0.1/dist/chartjs-plugin-zoom.umd.min.js"></script>
     
     <style>
         .dashboard-header {
@@ -39,22 +42,30 @@
         }
         
         .multi-select {
-            border: 2px solid #e9ecef;
-            border-radius: 10px;
-            padding: 1rem;
-            background: #f8f9fa;
+            border-radius: 12px;
+            border: 2px solid #e0e6ed;
+            box-shadow: 0 2px 8px rgba(102,126,234,0.04);
+            font-size: 1.05rem;
+            transition: border-color 0.2s;
         }
-        
+        .form-select:focus, .multi-select:focus {
+            border-color: #667eea;
+            box-shadow: 0 0 0 2px #667eea33;
+        }
+        .multi-select {
+            background: #f8f9fa;
+            padding: 1rem;
+        }
         .selected-item {
-            background: #667eea;
+            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
             color: white;
             padding: 0.5rem 1rem;
             border-radius: 20px;
             margin: 0.25rem;
             display: inline-block;
-            font-size: 0.9rem;
+            font-size: 0.95rem;
+            font-weight: 500;
         }
-        
         .selected-item .remove-btn {
             background: rgba(255,255,255,0.3);
             border: none;
@@ -64,6 +75,22 @@
             height: 20px;
             margin-left: 0.5rem;
             cursor: pointer;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-size: 1.1em;
+            line-height: 1;
+            padding: 0;
+        }
+        .form-select option[disabled] {
+            color: #aaa;
+        }
+        .dropdown-search {
+            width: 100%;
+            margin-bottom: 0.5rem;
+            border-radius: 8px;
+            border: 1px solid #e0e6ed;
+            padding: 0.4rem 0.7rem;
         }
         
         .forecast-btn {
@@ -181,29 +208,24 @@
         }
         
         .inventory-status-card {
-            background: white;
             border-radius: 15px;
-            padding: 1.5rem;
-            box-shadow: 0 4px 15px rgba(0,0,0,0.1);
-            margin-bottom: 1rem;
-            border-left: 5px solid #667eea;
+            background: #fff;
+            padding: 1.5rem 1.2rem 1.2rem 1.2rem;
+            margin-bottom: 0.5rem;
+            border-left: 6px solid #e3f0fc;
+            min-height: 260px;
+            transition: box-shadow 0.2s, border-color 0.2s;
+            position: relative;
+            display: flex;
+            flex-direction: column;
+            justify-content: space-between;
         }
-        
-        .inventory-status-card.critical {
-            border-left-color: #ff6b6b;
-        }
-        
-        .inventory-status-card.high {
-            border-left-color: #ffa726;
-        }
-        
-        .inventory-status-card.medium {
-            border-left-color: #42a5f5;
-        }
-        
-        .inventory-status-card.low {
-            border-left-color: #66bb6a;
-        }
+        .inventory-status-card.critical { border-left-color: #ff6b6b; box-shadow: 0 2px 12px rgba(255,107,107,0.08); }
+        .inventory-status-card.high { border-left-color: #ffb74d; box-shadow: 0 2px 12px rgba(255,183,77,0.08); }
+        .inventory-status-card.medium { border-left-color: #26c6da; box-shadow: 0 2px 12px rgba(38,198,218,0.08); }
+        .inventory-status-card.low { border-left-color: #43a047; box-shadow: 0 2px 12px rgba(67,160,71,0.08); }
+        .inventory-status-card:hover { box-shadow: 0 4px 24px rgba(38,98,218,0.13); border-left-width: 8px; }
+        .inventory-status-card .mini-trend { font-size: 1.1rem; color: #bdbdbd; margin-top: 0.5rem; }
         
         .location-info {
             margin-bottom: 1rem;
@@ -469,6 +491,567 @@
         .tab-content {
             padding: 2rem 0;
         }
+
+        .insight-notification { border-left: 6px solid #667eea; background: #f8f9fa; }
+        .notification-success { border-color: #28a745 !important; background: #eafaf1 !important; }
+        .notification-danger { border-color: #dc3545 !important; background: #fbeaea !important; }
+        .notification-warning { border-color: #ffc107 !important; background: #fffbe6 !important; }
+        .notification-info { border-color: #17a2b8 !important; background: #eaf6fb !important; }
+        .notification-icon { color: #667eea; }
+        .notification-success .notification-icon { color: #28a745; }
+        .notification-danger .notification-icon { color: #dc3545; }
+        .notification-warning .notification-icon { color: #ffc107; }
+        .notification-info .notification-icon { color: #17a2b8; }
+        .metric-label { color: #888; font-size: 0.95em; }
+
+        .comparison-card canvas { max-height: 220px; margin-bottom: 1rem; }
+
+        .stat-card {
+            border-radius: 15px;
+            padding: 1.5rem 1rem;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+            margin-bottom: 1rem;
+            text-align: center;
+            position: relative;
+            background: #f8fafd;
+        }
+        .stat-card-lightblue { background: #e3f0fc !important; color: #2563eb !important; }
+        .stat-card-lightred { background: #ffeaea !important; color: #d32f2f !important; }
+        .stat-card-lightorange { background: #fff5e6 !important; color: #ff9800 !important; }
+        .stat-card-lightteal { background: #e0f7fa !important; color: #00838f !important; }
+        .stat-card-lightgreen { background: #e6f9ed !important; color: #388e3c !important; }
+        .stat-icon { font-size: 2.2rem; margin-bottom: 0.5rem; display: block; }
+        .card.h-100 { background: linear-gradient(135deg, #f8fafd 60%, #e3f0fc 100%); border: 1px solid #e3f0fc; box-shadow: 0 2px 10px rgba(0,0,0,0.07); }
+        .doughnut-legend {
+            display: flex;
+            justify-content: center;
+            gap: 1rem;
+            margin-top: 1rem;
+            flex-wrap: wrap;
+        }
+        .doughnut-legend .legend-pill {
+            display: inline-flex;
+            align-items: center;
+            gap: 0.5rem;
+            font-size: 0.98rem;
+            background: #fff;
+            border-radius: 20px;
+            padding: 0.25rem 0.9rem;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            border: 1px solid #eee;
+            transition: box-shadow 0.2s, border-color 0.2s;
+            cursor: pointer;
+            outline: none;
+            margin-right: 0.5rem;
+            margin-bottom: 0.3rem;
+        }
+        .doughnut-legend .legend-pill:focus, .doughnut-legend .legend-pill:hover {
+            box-shadow: 0 2px 8px rgba(0,0,0,0.10);
+            border-color: #2563eb;
+        }
+        .doughnut-legend .legend-color {
+            width: 18px;
+            height: 18px;
+            border-radius: 4px;
+            display: inline-block;
+            border: 1px solid #eee;
+        }
+        .card.h-100 { max-height: 340px; }
+        #stockoutRiskChart {
+            height: 100% !important;
+            width: 100% !important;
+            aspect-ratio: 1 / 1;
+            display: block;
+            margin: 0 auto;
+            max-height: none;
+        }
+        .card.h-100.p-3.shadow-sm {
+            min-height: 100%;
+            max-height: none;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .animated-bar-container {
+            width: 100%;
+            margin-top: 0.5rem;
+            margin-bottom: 0.2rem;
+            display: flex;
+            align-items: center;
+            gap: 0.5rem;
+            flex-wrap: nowrap;
+            overflow: hidden;
+        }
+        .animated-bar-bg {
+            width: 70%;
+            height: 14px;
+            background: #f1f3f6;
+            border-radius: 7px;
+            overflow: hidden;
+            position: relative;
+            flex-shrink: 0;
+        }
+        .animated-bar-fill {
+            height: 100%;
+            border-radius: 7px;
+            transition: width 1.2s cubic-bezier(0.4,0,0.2,1);
+            min-width: 5%;
+        }
+        .animated-bar-label {
+            font-size: 0.95rem;
+            font-weight: 500;
+            color: #444;
+            margin-left: 0.5rem;
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+            max-width: 38%;
+            display: inline-block;
+        }
+        .status-ok-badge {
+            min-width: 38px;
+            text-align: right;
+            margin-left: 0.5rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 8px;
+            background: #f8fafd;
+            font-weight: 500;
+            font-size: 0.98rem;
+            position: relative;
+            z-index: 1;
+        }
+        .stockout-risk-badge {
+            top: 12px;
+            right: 16px;
+            z-index: 2;
+            position: absolute !important;
+            pointer-events: none;
+            padding: 0;
+        }
+        .inventory-status-card {
+            padding-top: 1.7rem;
+            padding-bottom: 1.2rem;
+        }
+        .inventory-status-card .badge.bg-light.text-dark {
+            font-size: 1.01rem;
+            padding: 0.32em 0.8em;
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            border: 1px solid #eee;
+        }
+        .stockout-risk-badge-row {
+            min-height: 2.2rem;
+            margin-bottom: 0.2rem;
+            margin-top: 0.1rem;
+        }
+        .stockout-risk-badge-center {
+            font-size: 1.01rem;
+            padding: 0.32em 0.8em;
+            border-radius: 12px;
+            box-shadow: 0 1px 4px rgba(0,0,0,0.04);
+            border: 1px solid #eee;
+            background: #f8fafd !important;
+            color: #333 !important;
+            position: relative;
+            z-index: 2;
+        }
+        .status-ok-badge {
+            min-width: 38px;
+            text-align: right;
+            margin-left: 0.5rem;
+            padding: 0.15rem 0.5rem;
+            border-radius: 8px;
+            background: #f8fafd;
+            font-weight: 500;
+            font-size: 0.98rem;
+            position: relative;
+            z-index: 1;
+        }
+        .inventory-status-card {
+            padding-top: 2.2rem;
+            padding-bottom: 1.2rem;
+        }
+
+        .demand-alert-notification {
+            border-radius: 16px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.10);
+            margin-bottom: 1.2rem;
+            padding: 1.3rem 1.5rem 1.1rem 1.5rem;
+            background: #fff;
+            border-left: 7px solid #667eea;
+            position: relative;
+            opacity: 0;
+            transform: translateY(30px) scale(0.98);
+            transition: all 0.45s cubic-bezier(.4,1.4,.6,1), opacity 0.3s;
+            display: flex;
+            flex-direction: column;
+            animation: none;
+            z-index: 1;
+        }
+        .demand-alert-notification.show {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        .demand-alert-notification.animate-in {
+            animation: demandAlertIn 0.7s cubic-bezier(.4,1.4,.6,1) both;
+        }
+        .demand-alert-notification.animate-out {
+            animation: demandAlertOut 0.4s cubic-bezier(.4,1.4,.6,1) both;
+        }
+        @keyframes demandAlertIn {
+            from { opacity: 0; transform: translateY(30px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        @keyframes demandAlertOut {
+            from { opacity: 1; transform: translateY(0) scale(1); }
+            to { opacity: 0; transform: translateY(-20px) scale(0.96); }
+        }
+        .demand-alert-notification.critical { border-left-color: #ff6b6b; background: linear-gradient(90deg, #ffeaea 0%, #fff 100%); }
+        .demand-alert-notification.high { border-left-color: #ffb74d; background: linear-gradient(90deg, #fff5e6 0%, #fff 100%); }
+        .demand-alert-notification.medium { border-left-color: #26c6da; background: linear-gradient(90deg, #e0f7fa 0%, #fff 100%); }
+        .demand-alert-notification.low { border-left-color: #43a047; background: linear-gradient(90deg, #e6f9ed 0%, #fff 100%); }
+        .demand-alert-notification .notification-icon { font-size: 1.5rem; }
+        .demand-alert-notification .alert-recommendation { font-size: 1.08rem; font-weight: 500; color: #333; margin-bottom: 0.2rem; }
+        .demand-alert-notification .btn-close { position: relative; top: 0; right: 0; z-index: 2; }
+        .demand-alert-notification .badge { font-size: 0.98rem; padding: 0.4em 0.9em; border-radius: 12px; }
+        .demand-alert-notification .alert-timestamp { font-size: 0.93rem; margin-top: 0.2rem; }
+
+        .recommendation-alert-card {
+            border-radius: 16px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.10);
+            margin-bottom: 1.2rem;
+            padding: 1.3rem 1.5rem 1.1rem 1.5rem;
+            background: #fff;
+            border-left: 7px solid #667eea;
+            position: relative;
+            opacity: 0;
+            transform: translateY(30px) scale(0.98);
+            transition: all 0.45s cubic-bezier(.4,1.4,.6,1), opacity 0.3s;
+            display: flex;
+            flex-direction: column;
+            animation: none;
+            z-index: 1;
+        }
+        .recommendation-alert-card.show {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        .recommendation-alert-card.animate-in {
+            animation: demandAlertIn 0.7s cubic-bezier(.4,1.4,.6,1) both;
+        }
+        .recommendation-alert-card.animate-out {
+            animation: demandAlertOut 0.4s cubic-bezier(.4,1.4,.6,1) both;
+        }
+        .recommendation-alert-card.critical { border-left-color: #ff6b6b; background: linear-gradient(90deg, #ffeaea 0%, #fff 100%); }
+        .recommendation-alert-card.high { border-left-color: #ffb74d; background: linear-gradient(90deg, #fff5e6 0%, #fff 100%); }
+        .recommendation-alert-card.medium { border-left-color: #26c6da; background: linear-gradient(90deg, #e0f7fa 0%, #fff 100%); }
+        .recommendation-alert-card.low { border-left-color: #43a047; background: linear-gradient(90deg, #e6f9ed 0%, #fff 100%); }
+        .recommendation-alert-card .notification-icon { font-size: 1.5rem; }
+        .recommendation-alert-card .impact-bar-bg { width: 100px; height: 10px; background: #f1f3f6; border-radius: 5px; overflow: hidden; position: relative; }
+        .recommendation-alert-card .impact-bar-fill { height: 100%; border-radius: 5px; transition: width 1.2s cubic-bezier(0.4,0,0.2,1); }
+        .recommendation-alert-card .impact-label { font-size: 0.97rem; color: #444; margin-left: 0.5rem; white-space: nowrap; }
+        .recommendation-alert-card .btn-close { position: relative; top: 0; right: 0; z-index: 2; }
+        .recommendation-alert-card .badge { font-size: 0.98rem; padding: 0.4em 0.9em; border-radius: 12px; }
+        .recommendation-alert-card .action-item-tooltip { cursor: pointer; text-decoration: underline dotted #bbb; }
+        .recommendation-alert-card .action-item-tooltip:hover { color: #2563eb; background: #f1f3f6; }
+
+        .promo-alert-card {
+            border-radius: 16px;
+            box-shadow: 0 4px 18px rgba(0,0,0,0.10);
+            margin-bottom: 1.2rem;
+            padding: 1.3rem 1.5rem 1.1rem 1.5rem;
+            background: #fff;
+            border-left: 7px solid #667eea;
+            position: relative;
+            opacity: 0;
+            transform: translateY(30px) scale(0.98);
+            transition: all 0.45s cubic-bezier(.4,1.4,.6,1), opacity 0.3s;
+            display: flex;
+            flex-direction: column;
+            animation: none;
+            z-index: 1;
+        }
+        .promo-alert-card.show {
+            opacity: 1;
+            transform: translateY(0) scale(1);
+        }
+        .promo-alert-card.animate-in {
+            animation: demandAlertIn 0.7s cubic-bezier(.4,1.4,.6,1) both;
+        }
+        .promo-alert-card.animate-out {
+            animation: demandAlertOut 0.4s cubic-bezier(.4,1.4,.6,1) both;
+        }
+        .promo-alert-card.critical { border-left-color: #ff6b6b; background: linear-gradient(90deg, #ffeaea 0%, #fff 100%); }
+        .promo-alert-card.high { border-left-color: #ffb74d; background: linear-gradient(90deg, #fff5e6 0%, #fff 100%); }
+        .promo-alert-card.medium { border-left-color: #26c6da; background: linear-gradient(90deg, #e0f7fa 0%, #fff 100%); }
+        .promo-alert-card.low { border-left-color: #43a047; background: linear-gradient(90deg, #e6f9ed 0%, #fff 100%); }
+        .promo-alert-card .notification-icon { font-size: 1.5rem; }
+        .promo-alert-card .impact-bar-bg { width: 100px; height: 10px; background: #f1f3f6; border-radius: 5px; overflow: hidden; position: relative; }
+        .promo-alert-card .impact-bar-fill { height: 100%; border-radius: 5px; transition: width 1.2s cubic-bezier(0.4,0,0.2,1); }
+        .promo-alert-card .impact-label { font-size: 0.97rem; color: #444; margin-left: 0.5rem; white-space: nowrap; }
+        .promo-alert-card .btn-close { position: relative; top: 0; right: 0; z-index: 2; }
+        .promo-alert-card .badge { font-size: 0.98rem; padding: 0.4em 0.9em; border-radius: 12px; }
+        .promo-alert-card .alert-reasoning { font-size: 1.08rem; font-weight: 500; color: #333; margin-bottom: 0.2rem; }
+
+        .weather-summary-card-advanced {
+            background: linear-gradient(135deg, #e3f0fc 60%, #f8fafd 100%);
+            border-radius: 18px;
+            padding: 2.2rem 1.2rem 1.2rem 1.2rem;
+            margin-bottom: 2rem;
+            box-shadow: 0 6px 24px rgba(102,126,234,0.08);
+            animation: fadeInUp 0.7s cubic-bezier(.4,1.4,.6,1) both;
+        }
+        @keyframes fadeInUp {
+            from { opacity: 0; transform: translateY(40px) scale(0.98); }
+            to { opacity: 1; transform: translateY(0) scale(1); }
+        }
+        .stat-advanced-card {
+            border-radius: 15px;
+            padding: 1.2rem 1rem 1rem 1rem;
+            background: #fff;
+            min-height: 140px;
+            position: relative;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.06);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            transition: box-shadow 0.2s, border-color 0.2s;
+            cursor: pointer;
+            color: #1a237e;
+        }
+        .stat-advanced-card:hover {
+            box-shadow: 0 6px 24px rgba(38,98,218,0.13);
+            border-left: 6px solid #2563eb;
+        }
+        .stat-icon-advanced {
+            font-size: 2.2rem;
+            margin-bottom: 0.3rem;
+            color: #1a237e;
+        }
+        .gradient-blue { background: linear-gradient(135deg, #e3f0fc 0%, #b6cfff 100%) !important; }
+        .gradient-purple { background: linear-gradient(135deg, #d1c4e9 0%, #b3c6f7 100%) !important; }
+        .gradient-orange { background: linear-gradient(135deg, #ffe0b2 0%, #ffcc80 100%) !important; }
+        .gradient-green { background: linear-gradient(135deg, #e6f9ed 0%, #b9f6ca 100%) !important; }
+        .stat-value-advanced {
+            font-size: 2.1rem;
+            font-weight: 700;
+            color: #1a237e;
+            margin-bottom: 0.2rem;
+            transition: color 0.3s;
+        }
+        .stat-label-advanced {
+            font-size: 1.01rem;
+            color: #333;
+            margin-bottom: 0.1rem;
+            font-weight: 500;
+        }
+
+        .weather-advanced-card {
+            border-radius: 15px;
+            padding: 1.3rem 1.2rem 1.1rem 1.2rem;
+            background: #fff;
+            min-height: 120px;
+            position: relative;
+            box-shadow: 0 2px 10px rgba(0,0,0,0.07);
+            display: flex;
+            flex-direction: column;
+            transition: box-shadow 0.2s, border-color 0.2s;
+            animation: fadeInUp 0.7s cubic-bezier(.4,1.4,.6,1) both;
+        }
+        .weather-advanced-card:hover {
+            box-shadow: 0 6px 24px rgba(38,98,218,0.13);
+            border-left: 6px solid #2563eb;
+        }
+        .weather-advanced-icon {
+            font-size: 1.7rem;
+            color: #2563eb;
+        }
+        .gradient-blue { background: linear-gradient(135deg, #a8edea 0%, #fed6e3 100%) !important; }
+        .gradient-purple { background: linear-gradient(135deg, #d1c4e9 0%, #b3c6f7 100%) !important; }
+        .gradient-orange { background: linear-gradient(135deg, #ffe0b2 0%, #ffcc80 100%) !important; }
+        .gradient-green { background: linear-gradient(135deg, #e6f9ed 0%, #b9f6ca 100%) !important; }
+        .impact-bar-bg { width: 100px; height: 10px; background: #f1f3f6; border-radius: 5px; overflow: hidden; position: relative; }
+        .impact-bar-fill { height: 100%; border-radius: 5px; transition: width 1.2s cubic-bezier(0.4,0,0.2,1); }
+        .impact-label { font-size: 0.97rem; color: #444; margin-left: 0.5rem; white-space: nowrap; }
+
+        .inventory-overview-advanced.animate-in { animation: fadeInUp 0.7s cubic-bezier(.4,1.4,.6,1) both; }
+        .gradient-red { background: linear-gradient(135deg, #ffeaea 0%, #ff8a8a 100%) !important; }
+        .gradient-teal { background: linear-gradient(135deg, #e0f7fa 0%, #80deea 100%) !important; }
+
+        .forecast-summary-advanced.animate-in { animation: fadeInUp 0.7s cubic-bezier(.4,1.4,.6,1) both; }
+        .gradient-purple { background: linear-gradient(135deg, #d1c4e9 0%, #b3c6f7 100%) !important; }
+
+        .stat-advanced-card.gradient-purple { background: linear-gradient(135deg, #d1c4e9 0%, #b3c6f7 100%) !important; }
+        .stat-advanced-card.gradient-green { background: linear-gradient(135deg, #e6f9ed 0%, #81c784 100%) !important; }
+        .stat-advanced-card.gradient-blue { background: linear-gradient(135deg, #e3f0fc 0%, #b6cfff 100%) !important; }
+        .stat-advanced-card.gradient-orange { background: linear-gradient(135deg, #fff3e0 0%, #ffd180 100%) !important; }
+        .cluster-badge.animate-in { animation: fadeInUp 0.7s cubic-bezier(.4,1.4,.6,1) both; margin: 0.2rem 0.4rem 0.2rem 0; padding: 0.5rem 1.1rem; border-radius: 16px; color: #fff; font-weight: 600; font-size: 1.01rem; display: inline-block; box-shadow: 0 2px 8px rgba(0,0,0,0.07); }
+        .clustering-quality-advanced.animate-in { animation: fadeInUp 0.7s cubic-bezier(.4,1.4,.6,1) both; }
+
+        /* --- Advanced Clustering UI Styles --- */
+        .stat-advanced-card {
+            border-radius: 1.1rem;
+            box-shadow: 0 2px 12px 0 rgba(60,60,100,0.08), 0 1.5px 4px 0 rgba(60,60,100,0.06);
+            padding: 1.2rem 1.3rem 1.1rem 1.3rem;
+            background: #f8fafc;
+            transition: box-shadow 0.3s, transform 0.3s;
+            border: none;
+            position: relative;
+            overflow: hidden;
+            min-height: 110px;
+        }
+        .stat-advanced-card:hover {
+            box-shadow: 0 6px 24px 0 rgba(60,60,100,0.13), 0 2.5px 8px 0 rgba(60,60,100,0.10);
+            transform: translateY(-2px) scale(1.02);
+        }
+        .stat-advanced-card .stat-label {
+            color: #6c757d;
+            font-weight: 500;
+            letter-spacing: 0.03em;
+        }
+        .stat-advanced-card .stat-value {
+            font-size: 2.1rem;
+            font-weight: 700;
+            color: #22223b;
+            letter-spacing: -0.01em;
+        }
+
+        /* Cluster Profile Cards */
+        .stat-advanced-card .fw-bold {
+            color: #22223b;
+        }
+        .stat-advanced-card ul {
+            margin-bottom: 0.2rem;
+            padding-left: 1.1rem;
+            font-size: 1rem;
+        }
+        .stat-advanced-card .badge.bg-dark {
+            background: #e0e7ef !important;
+            color: #22223b !important;
+            font-weight: 500;
+            font-size: 0.95rem;
+        }
+        .stat-advanced-card .badge.bg-light {
+            background: #f1f5fa !important;
+            color: #5c5c7a !important;
+            font-weight: 500;
+            font-size: 0.92rem;
+        }
+
+        /* Animated Table Rows */
+        .animated-table .fade-in-row {
+            opacity: 0;
+            animation: fadeInRow 0.7s forwards;
+        }
+        @keyframes fadeInRow {
+            to { opacity: 1; }
+        }
+
+        /* Notification Cards */
+        .alert.animate-in {
+            animation: fadeInAlert 0.7s cubic-bezier(.4,0,.2,1);
+            border-radius: 1.1rem;
+            box-shadow: 0 2px 12px 0 rgba(60,60,100,0.07);
+            background: #f8fafc !important;
+            color: #22223b !important;
+            border: none;
+            font-size: 1.08rem;
+            padding: 1.1rem 1.2rem;
+            margin-bottom: 0.7rem;
+        }
+        @keyframes fadeInAlert {
+            from { opacity: 0; transform: translateY(20px); }
+            to { opacity: 1; transform: none; }
+        }
+        .alert-success.animate-in {
+            background: linear-gradient(90deg, #e0ffe7 0%, #f8fafc 100%) !important;
+            color: #1b5e20 !important;
+        }
+        .alert-info.animate-in {
+            background: linear-gradient(90deg, #e3f0ff 0%, #f8fafc 100%) !important;
+            color: #0d47a1 !important;
+        }
+        .alert-warning.animate-in {
+            background: linear-gradient(90deg, #fffbe7 0%, #f8fafc 100%) !important;
+            color: #b26a00 !important;
+        }
+        .alert-danger.animate-in {
+            background: linear-gradient(90deg, #ffeaea 0%, #f8fafc 100%) !important;
+            color: #b71c1c !important;
+        }
+        .alert-primary.animate-in {
+            background: linear-gradient(90deg, #e3eaff 0%, #f8fafc 100%) !important;
+            color: #1a237e !important;
+        }
+
+        /* Insight Notification */
+        .insight-notification {
+            border-left: 5px solid #38b6ff;
+            background: #f0faff !important;
+            color: #1a237e !important;
+            font-weight: 500;
+            box-shadow: 0 1px 6px 0 rgba(56,182,255,0.08);
+        }
+
+        /* Responsive tweaks */
+        @media (max-width: 767px) {
+            .stat-advanced-card { font-size: 0.98rem; padding: 0.8rem 0.7rem; }
+            .stat-advanced-card .stat-value { font-size: 1.3rem; }
+        }
+
+        /* --- Advanced Dropdown Styles for Clustering --- */
+        .clustering-section .form-select, .clustering-section .form-control {
+            border-radius: 0.9rem;
+            background: #f8fafc;
+            border: 1.5px solid #e3e8ee;
+            box-shadow: 0 1px 6px 0 rgba(60,60,100,0.06);
+            font-size: 1.08rem;
+            color: #22223b;
+            padding: 0.7rem 1.1rem;
+        }
+        .clustering-section .form-select:focus, .clustering-section .form-control:focus {
+            border-color: #38b6ff;
+            box-shadow: 0 0 0 2px #b3e5fc;
+            background: #f0faff;
+            color: #1a237e;
+        }
+        .clustering-section .form-select[multiple], .clustering-section .form-control[multiple] {
+            min-height: 110px;
+            background: linear-gradient(135deg, #f8fafc 60%, #e3f0ff 100%);
+            border-radius: 1.1rem;
+            font-size: 1.05rem;
+            color: #1a237e;
+            padding: 0.7rem 1.1rem;
+        }
+        .clustering-section label.form-label {
+            font-weight: 600;
+            color: #1a237e;
+            letter-spacing: 0.01em;
+            margin-bottom: 0.3rem;
+        }
+        .clustering-section .form-select option, .clustering-section .form-control option {
+            background: #f8fafc;
+            color: #22223b;
+            border-radius: 0.7rem;
+            padding: 0.3rem 0.7rem;
+        }
+        .clustering-section .form-select option:checked, .clustering-section .form-control option:checked {
+            background: #e3f0ff;
+            color: #2563eb;
+            font-weight: 600;
+        }
+        .clustering-section .form-select::-webkit-input-placeholder, .clustering-section .form-control::-webkit-input-placeholder {
+            color: #b0b8c1;
+        }
+        .clustering-section .form-select:disabled, .clustering-section .form-control:disabled {
+            background: #f1f5fa;
+            color: #b0b8c1;
+        }
+        @media (max-width: 767px) {
+            .clustering-section .form-select, .clustering-section .form-control { font-size: 0.98rem; padding: 0.5rem 0.7rem; }
+        }
     </style>
 </head>
 <body>
@@ -687,15 +1270,18 @@
                                 <!-- Inventory stats will be populated here -->
                             </div>
                         </div>
-                        
-                        <!-- Stockout Risk Chart -->
-                        <div class="chart-container">
-                            <canvas id="stockoutRiskChart"></canvas>
+                        <!-- Stockout Risk Chart + Demand Forecast Chart Row (side by side, 20/80 split) -->
+                        <div class="row g-4 align-items-stretch mb-4">
+                            <div class="col-lg-3 col-md-5 col-12 d-flex align-items-stretch align-items-center justify-content-center">
+                                <div class="card h-100 p-3 shadow-sm d-flex align-items-center justify-content-center" style="height: 100%; min-height: 100%; max-height: none;">
+                                    <canvas id="stockoutRiskChart" style="height: 100% !important; width: 100% !important; aspect-ratio: 1 / 1; display: block; margin: 0 auto;"></canvas>
                         </div>
-                        
-                        <!-- Demand Forecast Chart -->
-                        <div class="chart-container">
+                            </div>
+                            <div class="col-lg-9 col-md-7 col-12">
+                                <div class="card h-100 p-3 shadow-sm" style="max-height: 500px; overflow-x: auto; overflow-y: hidden;">
                             <canvas id="demandForecastChart"></canvas>
+                                </div>
+                            </div>
                         </div>
                         
                         <!-- Inventory Status Cards -->
@@ -828,7 +1414,7 @@
                         </div>
                     </div>
                     <div class="tab-pane fade" id="clustering" role="tabpanel">
-                        <div class="card mt-4">
+                        <div class="card mt-4 clustering-section">
                             <div class="card-header bg-dark text-white">
                                 <h5 class="mb-0"><i class="fas fa-project-diagram me-2"></i>Clustering & Segmentation</h5>
                             </div>
@@ -1029,6 +1615,162 @@
         let demandForecastChart = null;
         let weatherForecastData = null;
         
+        // --- Enhanced Dropdown Filtering Logic ---
+        let allStores = [];
+        let allProducts = [];
+        let allCities = [];
+        
+        async function loadDropdownData() {
+            try {
+                // Load cities
+                const citiesResponse = await fetch('/api/cities');
+                const cities = await citiesResponse.json();
+                allCities = cities;
+                const citySelect = document.getElementById('citySelect');
+                citySelect.innerHTML = '<option value="">Select a city...</option>';
+                cities.forEach(city => {
+                    const option = document.createElement('option');
+                    option.value = city.city_id;
+                    option.textContent = city.city_name;
+                    citySelect.appendChild(option);
+                });
+                
+                // Load stores
+                const storesResponse = await fetch('/api/stores');
+                const stores = await storesResponse.json();
+                allStores = stores;
+                updateStoreDropdown();
+
+                // Load products
+                const productsResponse = await fetch('/api/products');
+                const products = await productsResponse.json();
+                allProducts = products;
+                updateProductDropdown();
+            } catch (error) {
+                console.error('Error loading dropdown data:', error);
+            }
+        }
+
+        function updateStoreDropdown() {
+                const storeSelect = document.getElementById('storeSelect');
+                storeSelect.innerHTML = '<option value="">Select a store...</option>';
+            let filteredStores = allStores;
+            if (selectedCities.length > 0) {
+                const cityIds = selectedCities.map(c => c.id);
+                filteredStores = allStores.filter(store => cityIds.includes(store.city_id.toString()));
+            }
+            filteredStores.forEach(store => {
+                    const option = document.createElement('option');
+                    option.value = store.store_id;
+                    option.textContent = `${store.store_name} (${store.city_name || 'Unknown City'})`;
+                    storeSelect.appendChild(option);
+                });
+        }
+                
+        function updateProductDropdown() {
+                const productSelect = document.getElementById('productSelect');
+                productSelect.innerHTML = '<option value="">Select a product...</option>';
+            let filteredProducts = allProducts;
+            if (selectedCities.length > 0) {
+                // Optionally, filter products by city if you have city-product mapping
+                // For now, show all products (or use valid-products API if needed)
+            }
+            filteredProducts.forEach(product => {
+                    const option = document.createElement('option');
+                    option.value = product.product_id;
+                    option.textContent = product.product_name;
+                    productSelect.appendChild(option);
+                });
+        }
+
+        // Add search/filter to dropdowns
+        function addDropdownSearch(selectId) {
+            const select = document.getElementById(selectId);
+            const container = select.parentElement;
+            const search = document.createElement('input');
+            search.type = 'text';
+            search.className = 'dropdown-search';
+            search.placeholder = 'Search...';
+            container.insertBefore(search, select);
+            search.addEventListener('input', function() {
+                const filter = this.value.toLowerCase();
+                Array.from(select.options).forEach(option => {
+                    if (option.value === '') return; // keep default
+                    option.style.display = option.textContent.toLowerCase().includes(filter) ? '' : 'none';
+                });
+            });
+        }
+
+        document.addEventListener('DOMContentLoaded', function() {
+            loadDropdownData().then(() => {
+                addDropdownSearch('citySelect');
+                addDropdownSearch('storeSelect');
+                addDropdownSearch('productSelect');
+            });
+        });
+
+        // --- Update stores/products when cities change ---
+        function addCity() {
+            console.log('addCity called');
+            const citySelect = document.getElementById('citySelect');
+            const cityId = citySelect.value;
+            const cityName = citySelect.options[citySelect.selectedIndex].text;
+            if (cityId && !selectedCities.find(c => c.id === cityId)) {
+                selectedCities.push({id: cityId, name: cityName});
+                updateSelectedDisplay('selectedCities', selectedCities, removeCity);
+                citySelect.value = '';
+                updateStoreDropdown();
+                updateProductDropdown();
+                updateValidProducts();
+            }
+        }
+        function removeCity(index) {
+            selectedCities.splice(index, 1);
+            updateSelectedDisplay('selectedCities', selectedCities, removeCity);
+            updateStoreDropdown();
+            updateProductDropdown();
+            updateValidProducts();
+        }
+        function addStore() {
+            const storeSelect = document.getElementById('storeSelect');
+            const storeId = storeSelect.value;
+            const storeName = storeSelect.options[storeSelect.selectedIndex].text;
+            if (storeId && !selectedStores.find(s => s.id === storeId)) {
+                selectedStores.push({id: storeId, name: storeName});
+                updateSelectedDisplay('selectedStores', selectedStores, removeStore);
+                storeSelect.value = '';
+                updateProductDropdown();
+                updateValidProducts();
+            }
+        }
+        function removeStore(index) {
+            selectedStores.splice(index, 1);
+            updateSelectedDisplay('selectedStores', selectedStores, removeStore);
+            updateProductDropdown();
+            updateValidProducts();
+        }
+        function addProduct() {
+            const productSelect = document.getElementById('productSelect');
+            const productId = productSelect.value;
+            const productName = productSelect.options[productSelect.selectedIndex].text;
+            if (productId && !selectedProducts.find(p => p.id === productId)) {
+                selectedProducts.push({id: productId, name: productName});
+                updateSelectedDisplay('selectedProducts', selectedProducts, removeProduct);
+                productSelect.value = '';
+            }
+        }
+        function removeProduct(index) {
+            selectedProducts.splice(index, 1);
+            updateSelectedDisplay('selectedProducts', selectedProducts, removeProduct);
+        }
+        // Make these functions accessible from HTML onclick
+        window.addCity = addCity;
+        window.removeCity = removeCity;
+        window.addStore = addStore;
+        window.removeStore = removeStore;
+        window.addProduct = addProduct;
+        window.removeProduct = removeProduct;
+        
         // Loading functions
         function showLoading() {
             // Create loading overlay if it doesn't exist
@@ -1080,121 +1822,6 @@
             forecastDaysSlider.addEventListener('input', function() {
                 forecastDaysValue.textContent = this.value + ' days';
             });
-        }
-        
-        async function loadDropdownData() {
-            try {
-                // Load cities
-                const citiesResponse = await fetch('/api/cities');
-                const cities = await citiesResponse.json();
-                const citySelect = document.getElementById('citySelect');
-                citySelect.innerHTML = '<option value="">Select a city...</option>';
-                cities.forEach(city => {
-                    const option = document.createElement('option');
-                    option.value = city.city_id;
-                    option.textContent = city.city_name;
-                    citySelect.appendChild(option);
-                });
-                
-                // Load stores
-                const storesResponse = await fetch('/api/stores');
-                const stores = await storesResponse.json();
-                const storeSelect = document.getElementById('storeSelect');
-                storeSelect.innerHTML = '<option value="">Select a store...</option>';
-                stores.forEach(store => {
-                    const option = document.createElement('option');
-                    option.value = store.store_id;
-                    option.textContent = `${store.store_name} (${store.city_name || 'Unknown City'})`;
-                    storeSelect.appendChild(option);
-                });
-                
-                // Load products
-                const productsResponse = await fetch('/api/products');
-                const products = await productsResponse.json();
-                const productSelect = document.getElementById('productSelect');
-                productSelect.innerHTML = '<option value="">Select a product...</option>';
-                products.forEach(product => {
-                    const option = document.createElement('option');
-                    option.value = product.product_id;
-                    option.textContent = product.product_name;
-                    productSelect.appendChild(option);
-                });
-                
-            } catch (error) {
-                console.error('Error loading dropdown data:', error);
-            }
-        }
-        
-        function addCity() {
-            const citySelect = document.getElementById('citySelect');
-            const cityId = citySelect.value;
-            const cityName = citySelect.options[citySelect.selectedIndex].text;
-            
-            if (cityId && !selectedCities.find(c => c.id === cityId)) {
-                selectedCities.push({id: cityId, name: cityName});
-                updateSelectedDisplay('selectedCities', selectedCities, removeCity);
-                citySelect.value = '';
-                // Update valid products when cities change
-                updateValidProducts();
-            }
-        }
-        
-        function addStore() {
-            const storeSelect = document.getElementById('storeSelect');
-            const storeId = storeSelect.value;
-            const storeName = storeSelect.options[storeSelect.selectedIndex].text;
-            
-            if (storeId && !selectedStores.find(s => s.id === storeId)) {
-                selectedStores.push({id: storeId, name: storeName});
-                updateSelectedDisplay('selectedStores', selectedStores, removeStore);
-                storeSelect.value = '';
-                // Update valid products when stores change
-                updateValidProducts();
-            }
-        }
-        
-        function addProduct() {
-            const productSelect = document.getElementById('productSelect');
-            const productId = productSelect.value;
-            const productName = productSelect.options[productSelect.selectedIndex].text;
-            
-            if (productId && !selectedProducts.find(p => p.id === productId)) {
-                selectedProducts.push({id: productId, name: productName});
-                updateSelectedDisplay('selectedProducts', selectedProducts, removeProduct);
-                productSelect.value = '';
-            }
-        }
-        
-        function updateSelectedDisplay(containerId, items, removeFunction) {
-            const container = document.getElementById(containerId);
-            container.innerHTML = '';
-            
-            items.forEach((item, index) => {
-                const span = document.createElement('span');
-                span.className = 'selected-item';
-                span.innerHTML = `
-                    ${item.name}
-                    <button class="remove-btn" onclick="${removeFunction.name}(${index})">×</button>
-                `;
-                container.appendChild(span);
-            });
-        }
-        
-        function removeCity(index) {
-            selectedCities.splice(index, 1);
-            updateSelectedDisplay('selectedCities', selectedCities, removeCity);
-            updateValidProducts();
-        }
-        
-        function removeStore(index) {
-            selectedStores.splice(index, 1);
-            updateSelectedDisplay('selectedStores', selectedStores, removeStore);
-            updateValidProducts();
-        }
-        
-        function removeProduct(index) {
-            selectedProducts.splice(index, 1);
-            updateSelectedDisplay('selectedProducts', selectedProducts, removeProduct);
         }
         
         async function updateValidProducts() {
@@ -1376,61 +2003,104 @@
         
         function displayInventoryOverview(inventoryStatus) {
             const statGrid = document.getElementById('inventoryStatGrid');
-            
+            statGrid.innerHTML = '';
             if (!inventoryStatus || inventoryStatus.length === 0) {
                 statGrid.innerHTML = '<div class="col-12 text-center">No inventory data available</div>';
                 return;
             }
-            
             const totalProducts = inventoryStatus.length;
             const criticalItems = inventoryStatus.filter(item => item.stockout_risk_score >= 0.8).length;
             const highRiskItems = inventoryStatus.filter(item => item.stockout_risk_score >= 0.6).length;
             const avgStockLevel = inventoryStatus.reduce((sum, item) => sum + item.current_stock_level, 0) / totalProducts;
             const avgDaysUntilStockout = inventoryStatus.reduce((sum, item) => sum + item.days_until_stockout, 0) / totalProducts;
-            
+            // Animated counter helper
+            function animateValue(id, start, end, duration, suffix = '', decimals = 1) {
+                const obj = document.getElementById(id);
+                let startTimestamp = null;
+                const step = (timestamp) => {
+                    if (!startTimestamp) startTimestamp = timestamp;
+                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                    const value = start + (end - start) * progress;
+                    obj.textContent = value.toFixed(decimals) + suffix;
+                    if (progress < 1) {
+                        window.requestAnimationFrame(step);
+                    }
+                };
+                window.requestAnimationFrame(step);
+            }
+            // Card HTML
             statGrid.innerHTML = `
-                <div class="stat-item">
-                    <div class="stat-value">${totalProducts}</div>
-                    <div class="stat-label">Products Analyzed</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value text-danger">${criticalItems}</div>
-                    <div class="stat-label">Critical Risk Items</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value text-warning">${highRiskItems}</div>
-                    <div class="stat-label">High Risk Items</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value">${avgStockLevel.toFixed(0)}</div>
-                    <div class="stat-label">Avg Stock Level</div>
-                </div>
-                <div class="stat-item">
-                    <div class="stat-value">${avgDaysUntilStockout.toFixed(0)}</div>
-                    <div class="stat-label">Avg Days Until Stockout</div>
+                <div class="row g-3 align-items-center inventory-overview-advanced animate-in">
+                    <div class="col-6 col-md-2">
+                        <div class="stat-advanced-card gradient-blue shadow-sm" title="Total number of products analyzed">
+                            <div class="stat-icon-advanced"><i class="fas fa-boxes"></i></div>
+                            <div class="stat-value-advanced" id="invTotalProducts">0</div>
+                            <div class="stat-label-advanced">Products Analyzed</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div class="stat-advanced-card gradient-red shadow-sm" title="Number of products at critical stockout risk (score ≥ 0.8)">
+                            <div class="stat-icon-advanced"><i class="fas fa-exclamation-triangle"></i></div>
+                            <div class="stat-value-advanced" id="invCriticalItems">0</div>
+                            <div class="stat-label-advanced">Critical Risk</div>
+                            <div class="progress mt-2" style="height: 7px;">
+                                <div class="progress-bar bg-danger" id="invCriticalBar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-2">
+                        <div class="stat-advanced-card gradient-orange shadow-sm" title="Number of products at high stockout risk (score ≥ 0.6)">
+                            <div class="stat-icon-advanced"><i class="fas fa-bolt"></i></div>
+                            <div class="stat-value-advanced" id="invHighRiskItems">0</div>
+                            <div class="stat-label-advanced">High Risk</div>
+                            <div class="progress mt-2" style="height: 7px;">
+                                <div class="progress-bar bg-warning" id="invHighRiskBar" style="width: 0%"></div>
+                            </div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-advanced-card gradient-teal shadow-sm" title="Average stock level across all products">
+                            <div class="stat-icon-advanced"><i class="fas fa-layer-group"></i></div>
+                            <div class="stat-value-advanced" id="invAvgStockLevel">0</div>
+                            <div class="stat-label-advanced">Avg Stock Level</div>
+                        </div>
+                    </div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-advanced-card gradient-green shadow-sm" title="Average days until stockout across all products">
+                            <div class="stat-icon-advanced"><i class="fas fa-clock"></i></div>
+                            <div class="stat-value-advanced" id="invAvgDaysUntilStockout">0</div>
+                            <div class="stat-label-advanced">Avg Days Until Stockout</div>
+                        </div>
+                    </div>
                 </div>
             `;
+            // Animate numbers and progress bars
+            setTimeout(() => {
+                animateValue('invTotalProducts', 0, totalProducts, 1000, '', 0);
+                animateValue('invCriticalItems', 0, criticalItems, 1000, '', 0);
+                animateValue('invHighRiskItems', 0, highRiskItems, 1000, '', 0);
+                animateValue('invAvgStockLevel', 0, avgStockLevel, 1200, '', 0);
+                animateValue('invAvgDaysUntilStockout', 0, avgDaysUntilStockout, 1200, '', 0);
+                document.getElementById('invCriticalBar').style.width = `${((criticalItems / totalProducts) * 100).toFixed(1)}%`;
+                document.getElementById('invHighRiskBar').style.width = `${((highRiskItems / totalProducts) * 100).toFixed(1)}%`;
+            }, 200);
         }
         
         function displayStockoutRiskChart(stockoutRiskAnalysis, inventoryStatus) {
             const ctx = document.getElementById('stockoutRiskChart').getContext('2d');
-            
             if (stockoutRiskChart) {
                 stockoutRiskChart.destroy();
             }
-            
             if (!inventoryStatus || inventoryStatus.length === 0) {
                 return;
             }
-            
-            // Prepare data for simple bar chart showing risk levels using ALL inventory items
+            // Prepare data for donut chart
             const riskLevels = {
                 'Critical (>80%)': 0,
                 'High (60-80%)': 0,
                 'Medium (40-60%)': 0,
                 'Low (<40%)': 0
             };
-            
             inventoryStatus.forEach(item => {
                 const riskScore = item.stockout_risk_score || 0;
                 if (riskScore >= 0.8) {
@@ -1443,251 +2113,495 @@
                     riskLevels['Low (<40%)']++;
                 }
             });
-            
+            // AI-inspired gradients
+            const donutColors = [
+                ctx.createLinearGradient(0, 0, 0, 220), // Critical
+                ctx.createLinearGradient(0, 0, 0, 220), // High
+                ctx.createLinearGradient(0, 0, 0, 220), // Medium
+                ctx.createLinearGradient(0, 0, 0, 220)  // Low
+            ];
+            donutColors[0].addColorStop(0, '#ff5252'); donutColors[0].addColorStop(1, '#ff8a8a');
+            donutColors[1].addColorStop(0, '#ffb300'); donutColors[1].addColorStop(1, '#ffd180');
+            donutColors[2].addColorStop(0, '#26c6da'); donutColors[2].addColorStop(1, '#b2ebf2');
+            donutColors[3].addColorStop(0, '#43a047'); donutColors[3].addColorStop(1, '#b9f6ca');
+            const borderColors = ['#ff5252', '#ffb300', '#26c6da', '#43a047'];
+            // Find highest risk category
+            const maxIndex = Object.values(riskLevels).reduce((maxIdx, val, idx, arr) => val > arr[maxIdx] ? idx : maxIdx, 0);
+            const total = Object.values(riskLevels).reduce((a, b) => a + b, 0);
+            const maxPercent = total > 0 ? ((Object.values(riskLevels)[maxIndex] / total) * 100).toFixed(0) : 0;
+            const maxLabel = Object.keys(riskLevels)[maxIndex];
+            // Draw donut chart
             stockoutRiskChart = new Chart(ctx, {
-                type: 'bar',
+                type: 'doughnut',
                 data: {
                     labels: Object.keys(riskLevels),
                     datasets: [{
-                        label: 'Number of Items',
+                        label: 'Stockout Risk',
                         data: Object.values(riskLevels),
-                        backgroundColor: [
-                            'rgba(255, 99, 132, 0.8)',
-                            'rgba(255, 159, 64, 0.8)',
-                            'rgba(54, 162, 235, 0.8)',
-                            'rgba(75, 192, 192, 0.8)'
-                        ],
-                        borderColor: [
-                            'rgba(255, 99, 132, 1)',
-                            'rgba(255, 159, 64, 1)',
-                            'rgba(54, 162, 235, 1)',
-                            'rgba(75, 192, 192, 1)'
-                        ],
-                        borderWidth: 1
+                        backgroundColor: donutColors,
+                        borderColor: borderColors,
+                        borderWidth: 2,
+                        hoverOffset: 14,
+                        shadowOffsetX: 0,
+                        shadowOffsetY: 2,
+                        shadowBlur: 12,
+                        shadowColor: 'rgba(38,98,218,0.13)'
                     }]
                 },
                 options: {
                     responsive: true,
-                    maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Number of Items'
+                    animation: { animateRotate: true, animateScale: true, duration: 1400, easing: 'easeOutQuart' },
+                    plugins: {
+                        legend: { display: false },
+                        title: { display: false },
+                        tooltip: {
+                            backgroundColor: '#fff',
+                            titleColor: '#1a237e',
+                            bodyColor: '#333',
+                            borderColor: '#2563eb',
+                            borderWidth: 1,
+                            padding: 12,
+                            callbacks: {
+                                label: function(context) {
+                                    const label = context.label || '';
+                                    const value = context.parsed;
+                                    const percent = total > 0 ? ((value / total) * 100).toFixed(1) : 0;
+                                    const icons = ['🔥', '⚡', '💧', '🌱'];
+                                    return `${icons[context.dataIndex]} ${label}: ${value} items (${percent}%)`;
+                                }
                             }
                         }
                     },
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Stockout Risk Distribution'
-                        },
-                        legend: {
-                            display: false
+                    cutout: '78%',
+                    layout: { padding: 10 },
+                    hover: { mode: 'nearest', intersect: true },
+                    elements: { arc: { borderWidth: 2, borderColor: '#fff', shadowBlur: 10, shadowColor: 'rgba(38,98,218,0.13)' } }
+                },
+                plugins: [
+                    // Center percentage and label
+                    {
+                        id: 'doughnutlabel',
+                        afterDraw(chart) {
+                            const {ctx, chartArea, data} = chart;
+                            if (!data.datasets.length) return;
+                            ctx.save();
+                            ctx.font = 'bold 2.1rem Arial';
+                            ctx.fillStyle = borderColors[maxIndex];
+                            ctx.textAlign = 'center';
+                            ctx.textBaseline = 'middle';
+                            ctx.fillText(`${maxPercent}%`, (chartArea.left + chartArea.right) / 2, (chartArea.top + chartArea.bottom) / 2 - 8);
+                            ctx.font = '1rem Arial';
+                            ctx.fillStyle = '#888';
+                            ctx.fillText(maxLabel.split(' ')[0], (chartArea.left + chartArea.right) / 2, (chartArea.top + chartArea.bottom) / 2 + 18);
+                            ctx.restore();
+                        }
+                    },
+                    // Animated legend
+                    {
+                        id: 'animatedLegend',
+                        afterDraw(chart) {
+                            const legendContainer = ctx.canvas.parentElement.querySelector('.doughnut-legend');
+                            if (legendContainer) legendContainer.remove();
+                            const newLegend = document.createElement('div');
+                            newLegend.className = 'doughnut-legend mt-2 animate-in';
+                            const icons = ['🔥', '⚡', '💧', '🌱'];
+                            Object.keys(riskLevels).forEach((label, i) => {
+                                const swatch = `<span class="legend-pill" tabindex="0"><span class="legend-color" style="background:${borderColors[i]}"></span>${icons[i]} ${label}</span>`;
+                                newLegend.innerHTML += swatch;
+                            });
+                            ctx.canvas.parentElement.appendChild(newLegend);
                         }
                     }
-                }
+                ]
             });
         }
         
         function displayDemandForecastChart(inventoryStatus) {
-            const ctx = document.getElementById('demandForecastChart').getContext('2d');
-            
+            const canvas = document.getElementById('demandForecastChart');
+            const ctx = canvas.getContext('2d');
             if (demandForecastChart) {
                 demandForecastChart.destroy();
             }
-            
             if (!inventoryStatus || inventoryStatus.length === 0) {
                 return;
             }
-            
-            // Create demand vs stock chart
-            const labels = inventoryStatus.map(item => item.product_name);
+            // Prepare data
+            const fullLabels = inventoryStatus.map(item => `${item.product_name} (${item.store_name})`);
+            const labels = fullLabels;
             const stockData = inventoryStatus.map(item => item.current_stock_level);
             const demandData = inventoryStatus.map(item => item.avg_daily_demand * 30); // 30-day demand
-            
+            // Gradients for bars
+            const stockGradient = ctx.createLinearGradient(0, 0, 300, 0);
+            stockGradient.addColorStop(0, '#43a047'); stockGradient.addColorStop(1, '#b9f6ca');
+            const demandGradient = ctx.createLinearGradient(0, 0, 300, 0);
+            demandGradient.addColorStop(0, '#ffb300'); demandGradient.addColorStop(1, '#ffd180');
+            // Bar colors: green if stock >= demand, red if below
+            const barColors = stockData.map((stock, i) => stock >= demandData[i] ? stockGradient : '#ff5252');
+            // Set chart height dynamically
+            const chartHeight = Math.min(Math.max(labels.length * 40, 200), 500);
+            canvas.style.height = chartHeight + 'px';
+            canvas.height = chartHeight;
+            // Draw chart
             demandForecastChart = new Chart(ctx, {
                 type: 'bar',
                 data: {
                     labels: labels,
-                    datasets: [{
+                    datasets: [
+                        {
                         label: 'Current Stock',
                         data: stockData,
-                        backgroundColor: 'rgba(54, 162, 235, 0.8)',
-                        borderColor: 'rgba(54, 162, 235, 1)',
-                        borderWidth: 1
-                    }, {
+                            backgroundColor: barColors,
+                            borderColor: barColors,
+                            borderWidth: 1,
+                            barPercentage: 0.7,
+                            categoryPercentage: 0.7,
+                            borderRadius: 8,
+                            shadowOffsetX: 0,
+                            shadowOffsetY: 2,
+                            shadowBlur: 10,
+                            shadowColor: 'rgba(67,160,71,0.13)'
+                        },
+                        {
                         label: '30-Day Demand Forecast',
                         data: demandData,
-                        backgroundColor: 'rgba(255, 99, 132, 0.8)',
-                        borderColor: 'rgba(255, 99, 132, 1)',
-                        borderWidth: 1
-                    }]
+                            backgroundColor: demandGradient,
+                            borderColor: demandGradient,
+                            borderWidth: 1,
+                            barPercentage: 0.7,
+                            categoryPercentage: 0.7,
+                            borderRadius: 8,
+                            shadowOffsetX: 0,
+                            shadowOffsetY: 2,
+                            shadowBlur: 10,
+                            shadowColor: 'rgba(255,179,0,0.13)'
+                        }
+                    ]
                 },
                 options: {
+                    indexAxis: 'y',
                     responsive: true,
                     maintainAspectRatio: false,
-                    scales: {
-                        y: {
-                            beginAtZero: true,
-                            title: {
-                                display: true,
-                                text: 'Units'
+                    animation: {
+                        duration: 1400,
+                        easing: 'easeOutQuart'
+                    },
+                    plugins: {
+                        legend: { display: false },
+                        title: {
+                            display: true,
+                            text: 'Current Stock vs 30-Day Demand Forecast',
+                            color: '#1a237e',
+                            font: { size: 18, weight: 'bold' }
+                        },
+                        tooltip: {
+                            backgroundColor: '#fff',
+                            titleColor: '#1a237e',
+                            bodyColor: '#333',
+                            borderColor: '#2563eb',
+                            borderWidth: 1,
+                            padding: 12,
+                            callbacks: {
+                                title: function(context) {
+                                    const idx = context[0].dataIndex;
+                                    return fullLabels[idx];
+                                },
+                                label: function(context) {
+                                    const idx = context.dataIndex;
+                                    if (context.dataset.label === 'Current Stock') {
+                                        return `🟩 Current Stock: ${stockData[idx]} units`;
+                                    } else {
+                                        return `🟨 30-Day Demand: ${demandData[idx].toFixed(0)} units`;
+                                    }
+                                }
                             }
                         }
                     },
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Current Stock vs 30-Day Demand Forecast'
+                    scales: {
+                        x: {
+                            beginAtZero: true,
+                            title: {
+                                display: true,
+                                text: 'Units',
+                                color: '#1a237e',
+                                font: { size: 14, weight: 'bold' }
+                            },
+                            ticks: {
+                                font: { size: 12 },
+                                color: '#333'
+                            },
+                            grid: { color: '#e3f0fc' }
+                        },
+                        y: {
+                            title: { display: false },
+                            ticks: {
+                                font: { size: 12 },
+                                color: '#333',
+                                autoSkip: false
+                            },
+                            grid: { color: '#f8fafd' }
                         }
                     }
-                }
+                },
+                plugins: [
+                    // Custom legend plugin
+                    {
+                        id: 'customLegend',
+                        afterDraw(chart) {
+                            const legendId = 'demand-bar-legend';
+                            let legend = document.getElementById(legendId);
+                            if (legend) legend.remove();
+                            legend = document.createElement('div');
+                            legend.id = legendId;
+                            legend.className = 'doughnut-legend mt-2 animate-in';
+                            legend.innerHTML = `
+                                <span class="legend-pill" tabindex="0"><span class="legend-color" style="background:#43a047"></span>🟩 Current Stock</span>
+                                <span class="legend-pill" tabindex="0"><span class="legend-color" style="background:#ffb300"></span>🟨 30-Day Demand</span>
+                                <span class="legend-pill" tabindex="0"><span class="legend-color" style="background:#ff5252"></span>🔴 Stock Below Demand</span>
+                            `;
+                            chart.canvas.parentElement.appendChild(legend);
+                        }
+                    }
+                ]
             });
         }
         
         function displayInventoryStatusCards(inventoryStatus) {
             const container = document.getElementById('inventoryStatusContainer');
             container.innerHTML = '';
-            
             if (!inventoryStatus || inventoryStatus.length === 0) {
                 container.innerHTML = '<div class="text-center">No inventory data available</div>';
                 return;
             }
-            
+            // Card grid
+            const row = document.createElement('div');
+            row.className = 'row g-4';
             inventoryStatus.forEach(item => {
                 const urgencyClass = item.stockout_risk_score >= 0.8 ? 'critical' : 
                                    item.stockout_risk_score >= 0.6 ? 'high' :
                                    item.stockout_risk_score >= 0.4 ? 'medium' : 'low';
-                
-                const card = document.createElement('div');
-                card.className = `inventory-status-card ${urgencyClass}`;
-                card.innerHTML = `
-                    <div class="row">
-                        <div class="col-md-8">
-                            <h5>${item.product_name}</h5>
-                            <div class="location-info mb-2">
-                                <span class="badge bg-secondary me-2">${item.city_name}</span>
-                                <span class="badge bg-info">${item.store_name}</span>
+                let statusText = '';
+                let statusIcon = '';
+                let statusColor = '';
+                let barGradient = '';
+                if (urgencyClass === 'critical') {
+                    statusText = 'Stockout Imminent';
+                    statusIcon = 'fa-exclamation-triangle';
+                    statusColor = 'danger';
+                    barGradient = 'linear-gradient(90deg, #ff6b6b 0%, #ffb3b3 100%)';
+                } else if (urgencyClass === 'high') {
+                    statusText = 'Reorder Now';
+                    statusIcon = 'fa-bolt';
+                    statusColor = 'warning';
+                    barGradient = 'linear-gradient(90deg, #ffb74d 0%, #ffe0b2 100%)';
+                } else if (urgencyClass === 'medium') {
+                    statusText = 'Monitor Closely';
+                    statusIcon = 'fa-info-circle';
+                    statusColor = 'info';
+                    barGradient = 'linear-gradient(90deg, #26c6da 0%, #b2ebf2 100%)';
+                } else {
+                    statusText = 'Healthy';
+                    statusIcon = 'fa-check-circle';
+                    statusColor = 'success';
+                    barGradient = 'linear-gradient(90deg, #43a047 0%, #b9f6ca 100%)';
+                }
+                // Mini-trend (sparkline) for stock/demand (optional, placeholder)
+                const sparkline = `<span class=\"sparkline\" title=\"Stock trend (placeholder)\">▁▂▃▄▅▆▇</span>`;
+                // Card
+                const col = document.createElement('div');
+                col.className = 'col-lg-4 col-md-6 col-12 d-flex align-items-stretch';
+                col.innerHTML = `
+                    <div class=\"inventory-status-card ${urgencyClass} shadow-sm h-100 position-relative d-flex flex-column justify-content-between\">
+                        <div class=\"stockout-risk-badge-row w-100 d-flex justify-content-center align-items-center mb-1\">
+                            <span class=\"badge bg-light text-dark stockout-risk-badge-center\" title=\"Stockout Risk\">${(item.stockout_risk_score * 100).toFixed(0)}%</span>
                             </div>
-                            <p class="mb-2">
+                        <div class=\"d-flex align-items-center mb-2 justify-content-between\">
+                            <span class=\"badge bg-${statusColor} me-2\"><i class=\"fas ${statusIcon}\"></i> ${statusText}</span>
+                            <span class=\"status-ok-badge small text-muted ms-2\">${item.days_until_stockout <= 2 ? '⚠️ Immediate' : item.days_until_stockout <= 7 ? 'Soon' : 'OK'}</span>
+                        </div>
+                        <h5 class=\"mb-1\">${item.product_name}</h5>
+                        <div class=\"location-info mb-2\">
+                            <span class=\"badge bg-secondary me-2\">${item.city_name}</span>
+                            <span class=\"badge bg-info\">${item.store_name}</span>
+                        </div>
+                        <div class=\"mb-2\">
                                 <strong>Current Stock:</strong> ${item.current_stock_level} units<br>
                                 <strong>Daily Demand:</strong> ${item.avg_daily_demand.toFixed(1)} units<br>
                                 <strong>Days Until Stockout:</strong> ${item.days_until_stockout} days<br>
                                 <strong>Stockout Frequency:</strong> ${(item.stockout_frequency * 100).toFixed(1)}%
-                            </p>
-                            ${item.last_stockout_date ? `<small class="text-muted">Last stockout: ${item.last_stockout_date}</small>` : ''}
                         </div>
-                        <div class="col-md-4 text-center">
-                            <div class="stockout-risk-gauge">
-                                <div class="progress" style="height: 20px;">
-                                    <div class="progress-bar bg-${urgencyClass === 'critical' ? 'danger' : urgencyClass === 'high' ? 'warning' : urgencyClass === 'medium' ? 'info' : 'success'}" 
-                                         style="width: ${item.stockout_risk_score * 100}%">
-                                        ${(item.stockout_risk_score * 100).toFixed(0)}%
+                        <div class=\"mb-2\">
+                            <strong>Recommended Reorder:</strong> <span class=\"badge bg-primary\">${item.recommended_reorder_quantity} units</span>
                                     </div>
+                        <div class=\"mb-2\">
+                            <span class=\"text-muted\">${item.last_stockout_date ? `Last stockout: ${item.last_stockout_date}` : ''}</span>
                                 </div>
-                                <small class="text-muted">Stockout Risk</small>
+                        <div class=\"mini-trend mb-2\">${sparkline}</div>
+                        <div class=\"animated-bar-container\">
+                            <div class=\"animated-bar-bg\">
+                                <div class=\"animated-bar-fill\" style=\"width: 0; background: ${barGradient};\"></div>
                             </div>
-                            <div class="mt-3">
-                                <strong>Recommended Reorder:</strong><br>
-                                <span class="badge bg-primary">${item.recommended_reorder_quantity} units</span>
-                            </div>
+                            <span class=\"animated-bar-label text-truncate\" title=\"Stockout Risk: ${(item.stockout_risk_score * 100).toFixed(0)}%\">Stockout Risk: ${(item.stockout_risk_score * 100).toFixed(0)}%</span>
                         </div>
                     </div>
                 `;
-                container.appendChild(card);
+                row.appendChild(col);
+                // Animate the bar after DOM insertion
+                setTimeout(() => {
+                    const bar = col.querySelector('.animated-bar-fill');
+                    if (bar) {
+                        bar.style.transition = 'width 1.2s cubic-bezier(0.4,0,0.2,1)';
+                        bar.style.width = `${Math.max(5, Math.round(item.stockout_risk_score * 100))}%`;
+                    }
+                }, 100);
             });
+            container.appendChild(row);
         }
         
         function displayDemandInsights(demandInsights) {
             const container = document.getElementById('demandInsightsContainer');
             container.innerHTML = '';
-            
             if (!demandInsights || demandInsights.length === 0) {
                 container.innerHTML = '<div class="text-center">No demand insights available</div>';
                 return;
             }
-            
-            demandInsights.forEach(insight => {
+            // Group by urgency
+            const urgencyOrder = ['critical', 'high', 'medium', 'low'];
+            urgencyOrder.forEach(level => {
+                demandInsights.filter(insight => insight.urgency_level === level).forEach((insight, idx) => {
                 const card = document.createElement('div');
-                card.className = `demand-insight-card ${insight.urgency_level}`;
-                
+                    card.className = `demand-alert-notification animate-in ${insight.urgency_level}`;
                 card.innerHTML = `
-                    <div class="row">
-                        <div class="col-md-8">
-                            <h5>
-                                <i class="fas fa-${insight.urgency_level === 'critical' ? 'exclamation-triangle' : 
-                                                insight.urgency_level === 'high' ? 'exclamation-circle' :
-                                                insight.urgency_level === 'medium' ? 'info-circle' : 'check-circle'} me-2"></i>
-                                ${insight.location} - ${insight.store_name}
-                            </h5>
-                            <h6>${insight.product_name}</h6>
-                            <p class="insight-text">${insight.recommended_action}</p>
-                            <small>Estimated Lost Sales: $${insight.estimated_lost_sales.toFixed(2)}</small>
+                        <div class="d-flex align-items-center mb-2">
+                            <span class="notification-icon me-2">
+                                <i class="fas ${level === 'critical' ? 'fa-exclamation-triangle' : level === 'high' ? 'fa-bolt' : level === 'medium' ? 'fa-info-circle' : 'fa-check-circle'}"></i>
+                            </span>
+                            <span class="fw-bold me-2">${insight.location} - ${insight.store_name}</span>
+                            <span class="badge bg-${level === 'critical' ? 'danger' : level === 'high' ? 'warning' : level === 'medium' ? 'info' : 'success'} ms-auto">${level.toUpperCase()}</span>
+                            <button class="btn-close ms-3" aria-label="Close" onclick="dismissDemandAlert(this.closest('.demand-alert-notification'))"></button>
                         </div>
-                        <div class="col-md-4">
-                            <div class="metrics">
-                                <div class="metric">
-                                    <div class="metric-value">${insight.current_stock}</div>
-                                    <div class="metric-label">Current Stock</div>
+                        <div class="d-flex flex-wrap align-items-center mb-2">
+                            <span class="me-3"><strong>Product:</strong> ${insight.product_name}</span>
+                            <span class="me-3"><strong>Days Left:</strong> ${insight.days_until_stockout}</span>
+                            <span class="me-3"><strong>Current Stock:</strong> ${insight.current_stock}</span>
+                            <span class="me-3"><strong>30-Day Demand:</strong> ${insight.forecasted_demand.toFixed(0)}</span>
+                            <span class="me-3"><strong>Est. Lost Sales:</strong> $${insight.estimated_lost_sales.toFixed(2)}</span>
                                 </div>
-                                <div class="metric">
-                                    <div class="metric-value">${insight.forecasted_demand.toFixed(0)}</div>
-                                    <div class="metric-label">30-Day Demand</div>
-                                </div>
-                                <div class="metric">
-                                    <div class="metric-value">${insight.days_until_stockout}</div>
-                                    <div class="metric-label">Days Left</div>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                `;
-                container.appendChild(card);
+                        <div class="alert-recommendation mb-2">${insight.recommended_action}</div>
+                        <div class="alert-timestamp text-end text-muted small">${insight.timestamp ? `Generated: ${insight.timestamp}` : ''}</div>
+                    `;
+                    // Play sound on new alert
+                    setTimeout(() => {
+                        card.classList.add('show');
+                        if (idx === 0 && level === urgencyOrder[0]) {
+                            const audio = document.getElementById('demandAlertSound');
+                            if (audio) { audio.currentTime = 0; audio.play(); }
+                        }
+                    }, 100 + idx * 80);
+                    // Auto-dismiss after 8s unless hovered
+                    let autoDismissTimeout;
+                    function setAutoDismiss() {
+                        autoDismissTimeout = setTimeout(() => {
+                            dismissDemandAlert(card);
+                        }, 60000); // 1 minute
+                    }
+                    card.addEventListener('mouseenter', () => clearTimeout(autoDismissTimeout));
+                    card.addEventListener('mouseleave', setAutoDismiss);
+                    setAutoDismiss();
+                    // Stack at top
+                    container.prepend(card);
+                });
             });
+        }
+        // Dismiss function for alerts
+        function dismissDemandAlert(card) {
+            if (!card) return;
+            card.classList.add('animate-out');
+            setTimeout(() => card.remove(), 400);
+        }
+        // Real-time update placeholder
+        function addDemandInsightAlert(insight) {
+            // Call this function with a new insight object to add a real-time alert
+            displayDemandInsights([insight]);
         }
         
         function displayInventoryRecommendations(recommendations) {
             const container = document.getElementById('recommendationsContainer');
             container.innerHTML = '';
-            
             if (!recommendations || recommendations.length === 0) {
                 container.innerHTML = '<div class="text-center">No recommendations available</div>';
                 return;
             }
-            
-            recommendations.forEach(rec => {
+            recommendations.forEach((rec, idx) => {
+                const urgency = rec.priority || 'medium';
+                let icon = 'fa-info-circle';
+                if (urgency === 'critical') icon = 'fa-exclamation-triangle';
+                else if (urgency === 'high') icon = 'fa-bolt';
+                else if (urgency === 'medium') icon = 'fa-lightbulb';
+                else if (urgency === 'low') icon = 'fa-check-circle';
+                // Visual impact bar (0-100 scale, based on estimated_impact)
+                const impact = Math.min(100, Math.round((rec.estimated_impact || 0) / 1000 * 100));
+                const impactColor = urgency === 'critical' ? '#ff6b6b' : urgency === 'high' ? '#ffb74d' : urgency === 'medium' ? '#26c6da' : '#43a047';
+                // Affected products/stores (if available)
+                let affectedHtml = '';
+                if (rec.affected_products || rec.affected_stores) {
+                    affectedHtml = `<div class='mb-2'>`;
+                    if (rec.affected_products && rec.affected_products.length) {
+                        affectedHtml += `<span class='me-2'><strong>Products:</strong> </span>` +
+                            rec.affected_products.map(p => `<span class='badge bg-primary me-1 mb-1'>${p}</span>`).join('');
+                    }
+                    if (rec.affected_stores && rec.affected_stores.length) {
+                        affectedHtml += `<span class='ms-3 me-2'><strong>Stores:</strong> </span>` +
+                            rec.affected_stores.map(s => `<span class='badge bg-info me-1 mb-1'>${s}</span>`).join('');
+                    }
+                    affectedHtml += `</div>`;
+                }
+                // Card
                 const card = document.createElement('div');
-                card.className = `recommendation-card ${rec.priority}`;
-                
+                card.className = `recommendation-alert-card animate-in ${urgency}`;
                 card.innerHTML = `
-                    <div class="row">
-                        <div class="col-md-8">
-                            <h5>
-                                <i class="fas fa-${rec.priority === 'critical' ? 'exclamation-triangle' : 
-                                                rec.priority === 'high' ? 'exclamation-circle' : 'info-circle'} me-2"></i>
-                                ${rec.title}
-                            </h5>
-                            <p>${rec.description}</p>
-                            <ul class="mb-0">
-                                ${rec.action_items.map(item => `<li>${item}</li>`).join('')}
-                            </ul>
-                        </div>
-                        <div class="col-md-4 text-center">
-                            <div class="badge bg-${rec.priority === 'critical' ? 'danger' : 
-                                                   rec.priority === 'high' ? 'warning' : 'info'} mb-2">
-                                ${rec.priority.toUpperCase()} PRIORITY
-                            </div>
-                            <div>
-                                <strong>Estimated Impact:</strong><br>
-                                $${rec.estimated_impact.toFixed(2)}
-                            </div>
-                        </div>
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="notification-icon me-2"><i class="fas ${icon}"></i></span>
+                        <span class="fw-bold me-2">${rec.title}</span>
+                        <span class="badge bg-${urgency === 'critical' ? 'danger' : urgency === 'high' ? 'warning' : urgency === 'medium' ? 'info' : 'success'} ms-auto">${urgency.toUpperCase()}</span>
+                        <button class="btn-close ms-3" aria-label="Close" onclick="dismissRecommendationAlert(this.closest('.recommendation-alert-card'))"></button>
                     </div>
+                    ${affectedHtml}
+                    <div class="mb-2"><span class="text-muted">${rec.description}</span></div>
+                    <ul class="mb-2 ps-3">
+                        ${(rec.action_items || []).map(item => `<li class="action-item-tooltip" title="Click for more info">${item}</li>`).join('')}
+                            </ul>
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="impact-bar-bg flex-grow-1 me-2"><div class="impact-bar-fill" style="width:${impact}%; background:${impactColor}"></div></div>
+                        <span class="impact-label">Impact: $${(rec.estimated_impact || 0).toLocaleString()}</span>
+                        </div>
+                    <div class="text-end small text-muted">${rec.type ? rec.type.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase()) : ''}</div>
                 `;
-                container.appendChild(card);
+                // Animate in
+                setTimeout(() => card.classList.add('show'), 100 + idx * 80);
+                // Auto-dismiss after 1 min unless hovered
+                let autoDismissTimeout;
+                function setAutoDismiss() {
+                    autoDismissTimeout = setTimeout(() => {
+                        dismissRecommendationAlert(card);
+                    }, 60000);
+                }
+                card.addEventListener('mouseenter', () => clearTimeout(autoDismissTimeout));
+                card.addEventListener('mouseleave', setAutoDismiss);
+                setAutoDismiss();
+                // Stack at top
+                container.prepend(card);
             });
+        }
+        // Real-time update function for recommendations
+        function addInventoryRecommendationAlert(rec) {
+            // Add a single new recommendation alert dynamically
+            displayInventoryRecommendations([rec]);
+        }
+        // Dismiss function for recommendations
+        function dismissRecommendationAlert(card) {
+            if (!card) return;
+            card.classList.add('animate-out');
+            setTimeout(() => card.remove(), 400);
         }
         
         function displaySummaryStats(summary) {
@@ -1750,12 +2664,21 @@
                         predictions: combo.forecast.predictions,
                         city_name: combo.city_name,
                         store_name: combo.store_name,
-                        total_predicted: combo.forecast.total_predicted
+                        product_name: combo.product_name || '',
+                        total_predicted: combo.forecast.total_predicted,
+                        confidence_upper: combo.forecast.confidence_upper || [],
+                        confidence_lower: combo.forecast.confidence_lower || []
                     };
                 } else {
                     // Sum predictions if multiple products for same city-store
                     for (let i = 0; i < combo.forecast.predictions.length; i++) {
                         cityStoreGroups[key].predictions[i] += combo.forecast.predictions[i];
+                        if (cityStoreGroups[key].confidence_upper[i] && combo.forecast.confidence_upper) {
+                            cityStoreGroups[key].confidence_upper[i] = Math.max(cityStoreGroups[key].confidence_upper[i], combo.forecast.confidence_upper[i]);
+                        }
+                        if (cityStoreGroups[key].confidence_lower[i] && combo.forecast.confidence_lower) {
+                            cityStoreGroups[key].confidence_lower[i] = Math.min(cityStoreGroups[key].confidence_lower[i], combo.forecast.confidence_lower[i]);
+                        }
                     }
                     cityStoreGroups[key].total_predicted += combo.forecast.total_predicted;
                 }
@@ -1770,8 +2693,34 @@
                     borderColor: colors[colorIndex % colors.length],
                     backgroundColor: colors[colorIndex % colors.length].replace('rgb', 'rgba').replace(')', ', 0.1)'),
                     tension: 0.4,
-                    fill: false
+                    fill: false,
+                    pointRadius: 3,
+                    pointHoverRadius: 6,
+                    product_name: data.product_name
                 });
+                // Add confidence intervals if available
+                if (data.confidence_upper.length && data.confidence_lower.length) {
+                    datasets.push({
+                        label: key + ' (Upper)',
+                        data: data.confidence_upper,
+                        borderColor: colors[colorIndex % colors.length],
+                        borderDash: [5, 5],
+                        fill: '+1',
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        hidden: true // Hide in legend by default
+                    });
+                    datasets.push({
+                        label: key + ' (Lower)',
+                        data: data.confidence_lower,
+                        borderColor: colors[colorIndex % colors.length],
+                        borderDash: [5, 5],
+                        fill: false,
+                        pointRadius: 0,
+                        pointHoverRadius: 0,
+                        hidden: true
+                    });
+                }
                 colorIndex++;
             });
             
@@ -1787,6 +2736,85 @@
                 options: {
                     responsive: true,
                     maintainAspectRatio: false,
+                    interaction: {
+                        mode: 'nearest',
+                        axis: 'x',
+                        intersect: false
+                    },
+                    hover: {
+                        mode: 'index',
+                        intersect: false
+                    },
+                    plugins: {
+                        title: {
+                            display: true,
+                            text: 'Multi-Dimensional Sales Forecast by City-Store'
+                        },
+                        legend: {
+                            display: true,
+                            position: 'top'
+                        },
+                        tooltip: {
+                            enabled: true,
+                            mode: 'index',
+                            intersect: false,
+                            callbacks: {
+                                label: function(context) {
+                                    const dataset = context.dataset;
+                                    const value = context.parsed.y;
+                                    let label = `${dataset.label}: $${value.toFixed(2)}`;
+                                    if (dataset.product_name) {
+                                        label += ` | Product: ${dataset.product_name}`;
+                                    }
+                                    // Add confidence interval if available
+                                    if (dataset.label.endsWith('(Upper)') || dataset.label.endsWith('(Lower)')) {
+                                        label += ' (Confidence)';
+                                    }
+                                    return label;
+                                },
+                                afterBody: function(context) {
+                                    // Optionally add more info here
+                                    return '';
+                                }
+                            }
+                        },
+                        crosshair: {
+                            enabled: true,
+                            line: {
+                                color: '#667eea',
+                                width: 1
+                            },
+                            sync: {
+                                enabled: false
+                            },
+                            zoom: {
+                                enabled: false
+                            }
+                        },
+                        zoom: {
+                            pan: {
+                                enabled: true,
+                                mode: 'xy',
+                                modifierKey: 'ctrl',
+                            },
+                            zoom: {
+                                wheel: {
+                                    enabled: true
+                                },
+                                pinch: {
+                                    enabled: true
+                                },
+                                mode: 'xy',
+                                drag: {
+                                    enabled: true
+                                }
+                            },
+                            limits: {
+                                x: { min: 0 },
+                                y: { min: 0 }
+                            }
+                        }
+                    },
                     scales: {
                         y: {
                             beginAtZero: true,
@@ -1801,16 +2829,6 @@
                                 text: 'Date'
                             }
                         }
-                    },
-                    plugins: {
-                        title: {
-                            display: true,
-                            text: 'Multi-Dimensional Sales Forecast by City-Store'
-                        },
-                        legend: {
-                            display: true,
-                            position: 'top'
-                        }
                     }
                 }
             });
@@ -1819,39 +2837,65 @@
         function displayInsights(insights) {
             const insightsContainer = document.getElementById('insightsContainer');
             insightsContainer.innerHTML = '';
+            if (!insights || insights.length === 0) {
+                insightsContainer.innerHTML = '<div class="alert alert-info text-center">No business insights available for this selection.</div>';
+                return;
+            }
             
             insights.forEach(insight => {
-                const insightCard = document.createElement('div');
-                insightCard.className = 'insight-card';
-                
-                insightCard.innerHTML = `
-                    <h5>${insight.location} - ${insight.store_name}</h5>
-                    <div class="insight-text">
-                        <strong>${insight.product_name}:</strong> ${insight.recommendation}
-                    </div>
-                    <div class="mt-2">
-                        <small class="text-light">
-                            <strong>Key Factors:</strong> ${insight.key_factors.join(', ')}
-                        </small>
-                    </div>
-                    <div class="metrics">
-                        <div class="metric">
-                            <div class="metric-value">$${insight.predicted_sales.toFixed(2)}</div>
-                            <div class="metric-label">Predicted Sales</div>
-                        </div>
-                        <div class="metric">
-                            <div class="metric-value">${insight.growth_rate.toFixed(1)}%</div>
-                            <div class="metric-label">Growth Rate</div>
-                        </div>
-                        <div class="metric">
-                            <div class="metric-value">${insight.confidence_score.toFixed(1)}%</div>
-                            <div class="metric-label">Confidence</div>
-                        </div>
-                    </div>
+                // Determine urgency and icon
+                let urgency = 'info';
+                let icon = 'fa-info-circle';
+                let cardClass = 'notification-info';
+                if (insight.growth_rate > 10) {
+                    urgency = 'success';
+                    icon = 'fa-arrow-up';
+                    cardClass = 'notification-success';
+                } else if (insight.growth_rate < -5) {
+                    urgency = 'danger';
+                    icon = 'fa-arrow-down';
+                    cardClass = 'notification-danger';
+                } else if (insight.confidence_score < 60) {
+                    urgency = 'warning';
+                    icon = 'fa-exclamation-triangle';
+                    cardClass = 'notification-warning';
+                }
 
+                // Notification-style card
+                const notification = document.createElement('div');
+                notification.className = `insight-notification ${cardClass} mb-3 p-3 rounded shadow-sm d-flex align-items-start`;
+                notification.innerHTML = `
+                    <div class="me-3">
+                        <span class="notification-icon"><i class="fas ${icon} fa-2x"></i></span>
+                    </div>
+                    <div class="flex-grow-1">
+                        <div class="d-flex justify-content-between align-items-center mb-1">
+                            <strong class="text-capitalize">${insight.location} - ${insight.store_name}</strong>
+                            <span class="badge bg-${urgency}">${urgency.charAt(0).toUpperCase() + urgency.slice(1)}</span>
+                    </div>
+                        <div class="mb-1">
+                            <span class="fw-bold">${insight.product_name}</span> &mdash; <span>${insight.recommendation}</span>
+                        </div>
+                        <div class="mb-2 small text-muted">
+                            <strong>Key Factors:</strong> ${insight.key_factors && insight.key_factors.length ? insight.key_factors.join(', ') : 'N/A'}
+                        </div>
+                        <div class="row g-2">
+                            <div class="col-auto">
+                                <span class="metric-label">Predicted Sales:</span> <span class="fw-semibold">$${insight.predicted_sales.toFixed(2)}</span>
+                        </div>
+                            <div class="col-auto">
+                                <span class="metric-label">Growth Rate:</span> <span class="fw-semibold">${insight.growth_rate.toFixed(1)}%</span>
+                    </div>
+                            <div class="col-auto">
+                                <span class="metric-label">Confidence:</span> <span class="fw-semibold">${insight.confidence_score.toFixed(1)}%</span>
+                            </div>
+                        </div>
+                        <div class="mt-2 small text-secondary">
+                            <i class="fas fa-clock me-1"></i>Analysis generated: ${new Date().toLocaleString()}
+                        </div>
+                    </div>
                 `;
-                
-                insightsContainer.appendChild(insightCard);
+                insightsContainer.appendChild(notification);
             });
         }
         
@@ -1859,53 +2903,79 @@
             // City comparison
             const cityComparison = document.getElementById('cityComparison');
             cityComparison.innerHTML = '';
-            
-            Object.entries(comparativeAnalysis.city_comparison || {}).forEach(([city, data]) => {
-                const item = document.createElement('div');
-                item.className = 'mb-2';
-                item.innerHTML = `
-                    <strong>${city}</strong><br>
-                    <small>$${data.total_predicted.toFixed(2)} total</small>
-                `;
-                cityComparison.appendChild(item);
-            });
-            
-            // Store comparison
             const storeComparison = document.getElementById('storeComparison');
             storeComparison.innerHTML = '';
-            
-            Object.entries(comparativeAnalysis.store_comparison || {}).forEach(([store, data]) => {
-                const item = document.createElement('div');
-                item.className = 'mb-2';
-                item.innerHTML = `
-                    <strong>${store}</strong><br>
-                    <small>$${data.total_predicted.toFixed(2)} total</small>
-                `;
-                storeComparison.appendChild(item);
-            });
-            
-            // Product comparison
             const productComparison = document.getElementById('productComparison');
             productComparison.innerHTML = '';
-            
-            Object.entries(comparativeAnalysis.product_comparison || {}).forEach(([product, data]) => {
-                const item = document.createElement('div');
-                item.className = 'mb-2';
-                item.innerHTML = `
-                    <strong>${product}</strong><br>
-                    <small>$${data.total_predicted.toFixed(2)} total</small>
-                `;
-                productComparison.appendChild(item);
-            });
-            
-            // Display key insights
             const keyInsights = document.getElementById('keyInsights');
             keyInsights.innerHTML = '';
-            
+
+            // --- Modern Chart.js Bar Charts for Each ---
+            function renderBarChart(containerId, dataObj, label, color) {
+                // Remove any previous canvas
+                const container = document.getElementById(containerId);
+                container.innerHTML = '';
+                const canvas = document.createElement('canvas');
+                container.appendChild(canvas);
+                const labels = Object.keys(dataObj);
+                const values = Object.values(dataObj).map(d => d.total_predicted);
+                new Chart(canvas, {
+                    type: 'bar',
+                    data: {
+                        labels: labels,
+                        datasets: [{
+                            label: label,
+                            data: values,
+                            backgroundColor: color,
+                            borderRadius: 8,
+                        }]
+                    },
+                    options: {
+                        responsive: true,
+                        plugins: {
+                            legend: { display: false },
+                            title: { display: false },
+                            tooltip: {
+                                callbacks: {
+                                    label: function(context) {
+                                        return `${context.label}: $${context.parsed.y.toLocaleString(undefined, {maximumFractionDigits: 2})}`;
+                                    }
+                                }
+                            }
+                        },
+                        scales: {
+                            y: {
+                                beginAtZero: true,
+                                title: { display: true, text: 'Total Predicted Sales ($)' }
+                            },
+                            x: {
+                                title: { display: false }
+                            }
+                        }
+                    }
+                });
+            }
+
+            // Render charts if data exists
+            if (comparativeAnalysis.city_comparison && Object.keys(comparativeAnalysis.city_comparison).length > 0) {
+                renderBarChart('cityComparison', comparativeAnalysis.city_comparison, 'City Performance', 'rgba(102,126,234,0.7)');
+            }
+            if (comparativeAnalysis.store_comparison && Object.keys(comparativeAnalysis.store_comparison).length > 0) {
+                renderBarChart('storeComparison', comparativeAnalysis.store_comparison, 'Store Performance', 'rgba(255,99,132,0.7)');
+            }
+            if (comparativeAnalysis.product_comparison && Object.keys(comparativeAnalysis.product_comparison).length > 0) {
+                renderBarChart('productComparison', comparativeAnalysis.product_comparison, 'Product Performance', 'rgba(54,162,235,0.7)');
+            }
+
+            // --- Key Insights as Notification Cards ---
             (comparativeAnalysis.insights || []).forEach(insight => {
-                const p = document.createElement('p');
-                p.textContent = insight;
-                keyInsights.appendChild(p);
+                const notification = document.createElement('div');
+                notification.className = 'insight-notification notification-info mb-2 p-2 rounded shadow-sm d-flex align-items-start';
+                notification.innerHTML = `
+                    <div class="me-2"><span class="notification-icon"><i class="fas fa-lightbulb"></i></span></div>
+                    <div class="flex-grow-1">${insight}</div>
+                `;
+                keyInsights.appendChild(notification);
             });
         }
 
@@ -2024,87 +3094,133 @@
         function displayWeatherSummary(data) {
             const container = document.getElementById('weatherSummaryCards');
             container.innerHTML = '';
-            
             const weatherSummary = data.weather_impact_summary;
             const holidaySummary = data.holiday_impact_summary;
-            
+            // Animated counter helper
+            function animateValue(id, start, end, duration, suffix = '', decimals = 1) {
+                const obj = document.getElementById(id);
+                let startTimestamp = null;
+                const step = (timestamp) => {
+                    if (!startTimestamp) startTimestamp = timestamp;
+                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                    const value = start + (end - start) * progress;
+                    obj.textContent = value.toFixed(decimals) + suffix;
+                    if (progress < 1) {
+                        window.requestAnimationFrame(step);
+                    }
+                };
+                window.requestAnimationFrame(step);
+            }
+            // Card HTML
             const summaryCard = document.createElement('div');
-            summaryCard.className = 'weather-summary-card';
+            summaryCard.className = 'weather-summary-card-advanced animate-in';
             summaryCard.innerHTML = `
-                <div class="row">
-                    <div class="col-md-3">
-                        <div class="weather-metric">
-                            <div class="weather-metric-value">${(weatherSummary.overall_weather_sensitivity * 100).toFixed(1)}%</div>
-                            <div class="weather-metric-label">Weather Sensitivity</div>
+                <div class="row g-3 align-items-center">
+                    <div class="col-6 col-md-3">
+                        <div class="stat-advanced-card gradient-blue shadow-sm" title="How much sales are affected by weather patterns">
+                            <div class="stat-icon-advanced"><i class="fas fa-cloud-sun"></i></div>
+                            <div class="stat-value-advanced" id="weatherSensitivityStat">0%</div>
+                            <div class="stat-label-advanced">Weather Sensitivity</div>
+                            <div class="progress mt-2" style="height: 7px;">
+                                <div class="progress-bar bg-info" id="weatherSensitivityBar" style="width: 0%"></div>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="weather-metric">
-                            <div class="weather-metric-value">${Object.keys(weatherSummary.city_weather_conditions).length}</div>
-                            <div class="weather-metric-label">Cities Analyzed</div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-advanced-card gradient-purple shadow-sm" title="Number of cities analyzed for weather impact">
+                            <div class="stat-icon-advanced"><i class="fas fa-city"></i></div>
+                            <div class="stat-value-advanced" id="citiesAnalyzedStat">0</div>
+                            <div class="stat-label-advanced">Cities Analyzed</div>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="weather-metric">
-                            <div class="weather-metric-value">${((holidaySummary.holiday_boost_average - 1) * 100).toFixed(1)}%</div>
-                            <div class="weather-metric-label">Holiday Boost</div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-advanced-card gradient-orange shadow-sm" title="Average sales boost during holidays">
+                            <div class="stat-icon-advanced"><i class="fas fa-gift"></i></div>
+                            <div class="stat-value-advanced" id="holidayBoostStat">0%</div>
+                            <div class="stat-label-advanced">Holiday Boost</div>
+                            <div class="progress mt-2" style="height: 7px;">
+                                <div class="progress-bar bg-warning" id="holidayBoostBar" style="width: 0%"></div>
+                            </div>
                         </div>
                     </div>
-                    <div class="col-md-3">
-                        <div class="weather-metric">
-                            <div class="weather-metric-value">${holidaySummary.current_holiday_status}</div>
-                            <div class="weather-metric-label">Holiday Status</div>
+                    <div class="col-6 col-md-3">
+                        <div class="stat-advanced-card gradient-green shadow-sm" title="Current holiday period status">
+                            <div class="stat-icon-advanced"><i class="fas fa-calendar-check"></i></div>
+                            <div class="stat-value-advanced" id="holidayStatusStat">-</div>
+                            <div class="stat-label-advanced">Holiday Status</div>
                         </div>
                     </div>
                 </div>
             `;
             container.appendChild(summaryCard);
+            // Animate numbers and progress bars
+            setTimeout(() => {
+                animateValue('weatherSensitivityStat', 0, (weatherSummary.overall_weather_sensitivity * 100), 1200, '%');
+                animateValue('citiesAnalyzedStat', 0, Object.keys(weatherSummary.city_weather_conditions).length, 1000, '', 0);
+                animateValue('holidayBoostStat', 0, ((holidaySummary.holiday_boost_average - 1) * 100), 1200, '%');
+                document.getElementById('holidayStatusStat').textContent = holidaySummary.current_holiday_status;
+                document.getElementById('weatherSensitivityBar').style.width = `${(weatherSummary.overall_weather_sensitivity * 100).toFixed(1)}%`;
+                document.getElementById('holidayBoostBar').style.width = `${((holidaySummary.holiday_boost_average - 1) * 100).toFixed(1)}%`;
+            }, 200);
         }
         
         function displayWeatherRecommendations(recommendations) {
             const container = document.getElementById('weatherRecommendationsContainer');
             container.innerHTML = '';
-            
             if (!recommendations || recommendations.length === 0) {
                 container.innerHTML = '<div class="text-center">No weather recommendations available</div>';
                 return;
             }
-            
-            recommendations.forEach(rec => {
+            recommendations.forEach((rec, idx) => {
+                // Determine urgency/color/icon
+                let cardClass = 'weather-advanced-card gradient-blue', icon = 'fa-cloud-sun', impactColor = '#2563eb';
+                if (rec.recommendation_type === 'increase_stock') { cardClass = 'weather-advanced-card gradient-green'; icon = 'fa-arrow-up'; impactColor = '#43a047'; }
+                else if (rec.recommendation_type === 'decrease_stock') { cardClass = 'weather-advanced-card gradient-orange'; icon = 'fa-arrow-down'; impactColor = '#ffb74d'; }
+                else if (rec.recommendation_type === 'bundle_opportunity') { cardClass = 'weather-advanced-card gradient-purple'; icon = 'fa-boxes'; impactColor = '#764ba2'; }
+                // Card
                 const card = document.createElement('div');
-                card.className = `weather-recommendation-card ${rec.recommendation_type.replace('_', '-')}`;
-                card.onclick = () => showProductWeatherDetail(rec);
-                
-                const weatherIcon = getWeatherIcon(rec.current_weather.weather_category);
-                const impactIcon = getImpactIcon(rec.recommendation_type);
-                
+                card.className = `${cardClass} shadow-sm animate-in mb-3`;
                 card.innerHTML = `
-                    <div class="d-flex justify-content-between align-items-start">
-                        <div>
-                            <h6 class="mb-1">
-                                ${weatherIcon} ${rec.product_name}
-                                <span class="badge bg-secondary ms-2">${rec.city_name}</span>
-                                <span class="badge bg-info ms-1">${rec.store_name}</span>
-                            </h6>
-                            <p class="mb-1">${rec.reasoning}</p>
-                            <small class="text-muted">
-                                Weather: ${rec.current_weather.temperature.toFixed(1)}°F, 
-                                ${rec.current_weather.weather_category}
-                            </small>
-                        </div>
-                        <div class="text-end">
-                            <div class="h5 mb-1">${impactIcon} ${rec.impact_percentage.toFixed(1)}%</div>
-                            <div class="small">
-                                <span class="badge bg-primary">${rec.suggested_stock_adjustment > 0 ? '+' : ''}${rec.suggested_stock_adjustment} units</span>
-                                <div class="mt-1">
-                                    Confidence: ${(rec.confidence_score * 100).toFixed(0)}%
-                                </div>
-                            </div>
-                        </div>
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="weather-advanced-icon me-2"><i class="fas ${icon}"></i></span>
+                        <span class="fw-bold me-2">${rec.product_name} <span class='badge bg-secondary ms-2'>${rec.city_name}</span> <span class='badge bg-info ms-1'>${rec.store_name}</span></span>
+                        <span class="badge bg-light text-dark ms-auto">${rec.recommendation_type.replace('_', ' ').toUpperCase()}</span>
+                    </div>
+                    <div class="mb-2"><span class="text-muted">${rec.reasoning}</span></div>
+                    <div class="row mb-2">
+                        <div class="col-6"><strong>Weather:</strong> ${rec.current_weather.temperature.toFixed(1)}°F, ${rec.current_weather.weather_category}</div>
+                        <div class="col-6"><strong>Suggested Action:</strong> <span class="badge bg-primary">${rec.suggested_stock_adjustment > 0 ? '+' : ''}${rec.suggested_stock_adjustment} units</span></div>
+                    </div>
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="impact-bar-bg flex-grow-1 me-2"><div class="impact-bar-fill" id="weatherImpactBar${idx}" style="width: 0%; background:${impactColor}"></div></div>
+                        <span class="impact-label">Impact: <span id="weatherImpactVal${idx}">0</span>%</span>
+                    </div>
+                    <div class="d-flex align-items-center mb-1">
+                        <span class="me-2"><i class="fas fa-bolt"></i> Confidence: <span id="weatherConfVal${idx}">0</span>%</span>
                     </div>
                 `;
                 container.appendChild(card);
+                // Animate impact/confidence
+                setTimeout(() => {
+                    animateWeatherStat(`weatherImpactVal${idx}`, 0, rec.impact_percentage, 1000);
+                    animateWeatherStat(`weatherConfVal${idx}`, 0, rec.confidence_score * 100, 1000);
+                    document.getElementById(`weatherImpactBar${idx}`).style.width = `${rec.impact_percentage.toFixed(1)}%`;
+                }, 200 + idx * 100);
             });
+            function animateWeatherStat(id, start, end, duration) {
+                const obj = document.getElementById(id);
+                let startTimestamp = null;
+                const step = (timestamp) => {
+                    if (!startTimestamp) startTimestamp = timestamp;
+                    const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                    const value = start + (end - start) * progress;
+                    obj.textContent = value.toFixed(1);
+                    if (progress < 1) {
+                        window.requestAnimationFrame(step);
+                    }
+                };
+                window.requestAnimationFrame(step);
+            }
         }
         
         function displayHolidayAnalysis(holidayData) {
@@ -2151,55 +3267,72 @@
         function displayPromotionalAnalysis(promotionalData) {
             const container = document.getElementById('promotionalAnalysisContainer');
             container.innerHTML = '';
-            
             if (!promotionalData || promotionalData.length === 0) {
                 container.innerHTML = '<div class="text-center">No promotional analysis available</div>';
                 return;
             }
-            
-            promotionalData.forEach(promo => {
+            promotionalData.forEach((promo, idx) => {
+                // Determine recommendation level from text
+                const recText = (promo.recommendation || '').toLowerCase();
+                let recLevel = 'recommended';
+                if (recText.includes('not recommended')) recLevel = 'not-recommended';
+                else if (recText.includes('highly')) recLevel = 'highly-recommended';
+                else if (recText.includes('moderate')) recLevel = 'moderate';
+                // Icon and color by recommendation
+                let icon = 'fa-thumbs-up', badgeColor = 'success', impactColor = '#43a047';
+                if (recLevel === 'not-recommended') { icon = 'fa-thumbs-down'; badgeColor = 'danger'; impactColor = '#ff6b6b'; }
+                else if (recLevel === 'moderate') { icon = 'fa-hand-paper'; badgeColor = 'warning'; impactColor = '#ffb74d'; }
+                else if (recLevel === 'highly-recommended') { icon = 'fa-bolt'; badgeColor = 'primary'; impactColor = '#2563eb'; }
+                // Fallback to uplift-based color if no clear recommendation
+                const uplift = Math.round((promo.expected_sales_increase || 0) * 100);
+                if (recLevel === 'recommended' && uplift < 10) { badgeColor = 'info'; impactColor = '#26c6da'; }
+                // Card
                 const card = document.createElement('div');
-                const recommendationLevel = promo.recommendation.toLowerCase().includes('highly') ? 'highly-recommended' :
-                                          promo.recommendation.toLowerCase().includes('recommended') ? 'recommended' :
-                                          promo.recommendation.toLowerCase().includes('moderate') ? 'moderate' : 'not-recommended';
-                
-                card.className = `promotional-analysis-card ${recommendationLevel}`;
+                card.className = `promo-alert-card animate-in ${recLevel}`;
                 card.innerHTML = `
-                    <div class="row">
-                        <div class="col-md-8">
-                            <h6>${promo.product_name} - ${promo.city_name} ${promo.store_name}</h6>
-                            <div class="mb-2">
-                                <strong>Promotion:</strong> ${(promo.discount_percentage * 100).toFixed(0)}% discount for ${promo.promotion_duration_days} days
+                    <div class="d-flex align-items-center mb-2">
+                        <span class="notification-icon me-2"><i class="fas ${icon}"></i></span>
+                        <span class="fw-bold me-2">${promo.product_name} <span class='badge bg-secondary ms-2'>${promo.city_name}</span> <span class='badge bg-info ms-1'>${promo.store_name}</span></span>
+                        <span class="badge bg-${badgeColor} ms-auto text-uppercase">${recLevel.replace('-', ' ')}</span>
+                        <button class="btn-close ms-3" aria-label="Close" onclick="dismissPromoAlert(this.closest('.promo-alert-card'))"></button>
                             </div>
-                            <div class="mb-2">
-                                <strong>Expected Sales Increase:</strong> ${(promo.expected_sales_increase * 100).toFixed(1)}%
+                    <div class="mb-2"><span class="text-muted">${promo.recommendation}</span></div>
+                    <div class="row mb-2">
+                        <div class="col-6 col-md-4"><strong>Discount:</strong> ${(promo.discount_percentage * 100).toFixed(0)}%</div>
+                        <div class="col-6 col-md-4"><strong>Duration:</strong> ${promo.promotion_duration_days} days</div>
+                        <div class="col-12 col-md-4"><strong>Optimal Timing:</strong> ${promo.optimal_timing || 'Any time'}</div>
                             </div>
-                            <div class="mb-2">
-                                <strong>Revenue Impact:</strong> 
-                                <span class="${promo.expected_revenue_impact >= 0 ? 'text-success' : 'text-danger'}">
-                                    $${promo.expected_revenue_impact.toFixed(2)}
-                                </span>
+                    <div class="row mb-2">
+                        <div class="col-6 col-md-4"><strong>Expected Uplift:</strong> <span class="text-success">+${uplift}%</span></div>
+                        <div class="col-6 col-md-4"><strong>Revenue Impact:</strong> <span class="${promo.expected_revenue_impact >= 0 ? 'text-success' : 'text-danger'}">$${promo.expected_revenue_impact.toFixed(2)}</span></div>
+                        <div class="col-12 col-md-4"><strong>Weather/Holiday Boost:</strong> <span title="Weather Boost">${promo.weather_boost_factor.toFixed(2)}x</span> / <span title="Holiday Boost">${promo.holiday_boost_factor.toFixed(2)}x</span></div>
                             </div>
-                            <div class="small text-muted">
-                                Weather Boost: ${promo.weather_boost_factor.toFixed(2)}x | 
-                                Holiday Boost: ${promo.holiday_boost_factor.toFixed(2)}x
+                    <div class="d-flex align-items-center mb-2">
+                        <div class="impact-bar-bg flex-grow-1 me-2"><div class="impact-bar-fill" style="width:${Math.min(100, uplift)}%; background:${impactColor}"></div></div>
+                        <span class="impact-label">Uplift: +${uplift}%</span>
                             </div>
-                        </div>
-                        <div class="col-md-4">
-                            <div class="text-center">
-                                <div class="h6 mb-1">${getRecommendationIcon(recommendationLevel)}</div>
-                                <div class="small">${promo.optimal_timing}</div>
-                            </div>
-                        </div>
-                    </div>
-                    <div class="mt-2">
-                        <div class="alert alert-${getRecommendationAlertClass(recommendationLevel)} py-2 mb-0">
-                            ${promo.recommendation}
-                        </div>
-                    </div>
+                    <div class="alert-reasoning mb-2">${promo.reasoning || 'No specific reasoning provided.'}</div>
                 `;
-                container.appendChild(card);
+                // Animate in
+                setTimeout(() => card.classList.add('show'), 100 + idx * 80);
+                // Auto-dismiss after 1 min unless hovered
+                let autoDismissTimeout;
+                function setAutoDismiss() {
+                    autoDismissTimeout = setTimeout(() => {
+                        dismissPromoAlert(card);
+                    }, 60000);
+                }
+                card.addEventListener('mouseenter', () => clearTimeout(autoDismissTimeout));
+                card.addEventListener('mouseleave', setAutoDismiss);
+                setAutoDismiss();
+                // Stack at top
+                container.prepend(card);
             });
+        }
+        function dismissPromoAlert(card) {
+            if (!card) return;
+            card.classList.add('animate-out');
+            setTimeout(() => card.remove(), 400);
         }
         
         function displayBundleRecommendations(bundleData) {
@@ -2303,22 +3436,26 @@
             
             // Generate notifications for promotional opportunities
             weatherForecastData.promotional_analysis.forEach(promo => {
-                if (promo.recommendation.toLowerCase().includes('highly') || promo.recommendation.toLowerCase().includes('recommended')) {
+                const recText = (promo.recommendation || '').toLowerCase();
+                let alertClass = 'alert-success', icon = 'fa-thumbs-up';
+                if (recText.includes('not recommended')) { alertClass = 'alert-danger'; icon = 'fa-thumbs-down'; }
+                else if (recText.includes('moderate')) { alertClass = 'alert-warning'; icon = 'fa-hand-paper'; }
+                else if (recText.includes('highly')) { alertClass = 'alert-primary'; icon = 'fa-bolt'; }
                     notifications.push({
-                        type: 'alert-success',
-                        title: `Promotion Opportunity: ${promo.product_name}`,
-                        message: `${(promo.discount_percentage * 100).toFixed(0)}% discount expected to increase sales by ${(promo.expected_sales_increase * 100).toFixed(1)}%`,
+                    type: alertClass,
+                    icon,
+                    title: `Promotion Opportunity: ${promo.product_name} (${promo.city_name}, ${promo.store_name})`,
+                    message: `${(promo.discount_percentage * 100).toFixed(0)}% discount for ${promo.promotion_duration_days} days expected to increase sales by ${(promo.expected_sales_increase * 100).toFixed(1)}%` + (promo.recommendation ? ` - ${promo.recommendation}` : ''),
                         action: `Revenue impact: $${promo.expected_revenue_impact.toFixed(2)}`,
                         confidence: 0.8
                     });
-                }
             });
             
             content.innerHTML = notifications.length > 0 ? notifications.map(notification => `
                 <div class="weather-alert ${notification.type}">
                     <div class="d-flex justify-content-between align-items-start">
                         <div>
-                            <h6 class="mb-1">${notification.title}</h6>
+                            <h6 class="mb-1"><i class="fas ${notification.icon} me-2"></i>${notification.title}</h6>
                             <p class="mb-1">${notification.message}</p>
                             <small><strong>Action:</strong> ${notification.action}</small>
                         </div>
@@ -2492,60 +3629,357 @@
                 return;
             }
             let html = '';
-            html += `<div class='mb-3'><strong>Algorithm:</strong> ${data.algorithm_used} &nbsp; <strong>Clusters:</strong> ${data.n_clusters}</div>`;
-            // Cluster Quality Metrics
-            html += `<div class='mb-3'><strong>Quality Metrics:</strong> <ul>`;
-            for (const [k, v] of Object.entries(data.cluster_quality_metrics)) {
-                html += `<li>${k.replace(/_/g, ' ')}: <b>${typeof v === 'number' ? v.toFixed(3) : v}</b></li>`;
-            }
-            html += `</ul></div>`;
-            // Insights
-            if (data.insights && data.insights.length) {
-                html += `<div class='alert alert-info'><ul>` + data.insights.map(i => `<li>${i}</li>`).join('') + `</ul></div>`;
-            }
-            // Cluster Profiles
-            html += `<h6>Cluster Profiles</h6><div class='row'>`;
+            // Build a mapping from cluster_id to profile for tooltips
+            const clusterProfileMap = {};
             data.cluster_profiles.forEach(profile => {
-                html += `<div class='col-md-4 mb-3'><div class='card h-100'><div class='card-body'>`;
-                html += `<h6 class='card-title'>${profile.cluster_name}</h6>`;
-                html += `<div><b>Entities:</b> ${profile.entity_count}</div>`;
-                html += `<div><b>Key Metrics:</b><ul>`;
-                for (const [k, v] of Object.entries(profile.key_metrics)) {
-                    html += `<li>${k.replace(/_/g, ' ')}: <b>${typeof v === 'number' ? v.toFixed(2) : v}</b></li>`;
-                }
-                html += `</ul></div>`;
-                if (profile.representative_entities && profile.representative_entities.length) {
-                    html += `<div><b>Examples:</b><ul>`;
-                    profile.representative_entities.forEach(e => {
-                        html += `<li>${e.name} (${e.id})</li>`;
-                    });
-                    html += `</ul></div>`;
-                }
-                html += `</div></div></div>`;
+                clusterProfileMap[profile.cluster_id] = profile;
+            });
+            // --- Stat Cards for Quality Metrics ---
+            html += `<div class='row mb-4'>`;
+            const pastelColors = [
+                'linear-gradient(135deg, #e0ffe7 0%, #f8fafc 100%)',
+                'linear-gradient(135deg, #e3f0ff 0%, #f8fafc 100%)',
+                'linear-gradient(135deg, #fffbe7 0%, #f8fafc 100%)',
+                'linear-gradient(135deg, #f1f5fa 0%, #f8fafc 100%)',
+                'linear-gradient(135deg, #ffeaea 0%, #f8fafc 100%)',
+            ];
+            Object.entries(data.cluster_quality_metrics).forEach(([k, v], idx) => {
+                html += `
+                <div class='col-md-3 mb-3'>
+                    <div class='stat-advanced-card shadow' style='background: ${pastelColors[idx % pastelColors.length]}; min-height: 110px;'>
+                        <div class='d-flex align-items-center'>
+                            <div class='me-3 display-6'><i class='fas fa-chart-line'></i></div>
+                            <div>
+                                <div class='stat-label text-uppercase' style='font-size: 0.9rem;'>${k.replace(/_/g, ' ')}</div>
+                                <div class='stat-value fw-bold' style='font-size: 1.5rem;' data-animate-number='${typeof v === 'number' ? v.toFixed(3) : v}'>${typeof v === 'number' ? v.toFixed(3) : v}</div>
+                            </div>
+                        </div>
+                    </div>
+                </div>`;
             });
             html += `</div>`;
-            // Entity Assignments
-            html += `<h6>Entity Assignments</h6><div style='max-height:300px;overflow:auto;'><table class='table table-sm table-bordered'><thead><tr>`;
+            // --- Insights as Notification Cards ---
+            if (data.insights && data.insights.length) {
+                html += `<div class='row mb-4'>` + data.insights.map(i => `
+                    <div class='col-md-6 mb-2'>
+                        <div class='alert alert-info animate-in insight-notification'><i class='fas fa-lightbulb me-2'></i>${i}</div>
+                    </div>`).join('') + `</div>`;
+            }
+            // --- Cluster Profiles as Animated Cards ---
+            html += `<h5 class='mb-2 mt-3'><i class='fas fa-layer-group me-2'></i>Cluster Profiles</h5><div class='row'>`;
+            data.cluster_profiles.forEach((profile, idx) => {
+                const grad = pastelColors[idx % pastelColors.length];
+                // Compose a user-friendly description for the cluster
+                let desc = profile.description || '';
+                if (!desc) {
+                    // Try to infer a description from key metrics
+                    const keys = Object.keys(profile.key_metrics).map(k => k.toLowerCase());
+                    if (keys.includes('total revenue mean') || keys.includes('avg sales')) {
+                        desc = 'High Revenue Stores: These stores have the highest sales and customer traffic.';
+                    } else if (keys.includes('stockout frequency mean')) {
+                        desc = 'Stockout-Prone Stores: These stores frequently run out of stock.';
+                    } else if (keys.includes('promotion effectiveness')) {
+                        desc = 'Promotion-Responsive Stores: These stores respond well to promotions.';
+                    } else {
+                        desc = 'Stores grouped by similar performance and behavior.';
+                    }
+                }
+                html += `<div class='col-md-4 mb-3'>
+                    <div class='stat-advanced-card shadow h-100' style='background: ${grad}; min-height: 180px;'>
+                        <div class='d-flex align-items-center mb-2'>
+                            <div class='me-3 display-6'><i class='fas fa-users'></i></div>
+                            <div>
+                                <div class='fw-bold' style='font-size: 1.1rem;'>${profile.cluster_name} <span class='badge bg-info ms-1'>Cluster ${profile.cluster_id}</span></div>
+                                <div class='text-muted' style='font-size: 0.97rem;'>${desc}</div>
+                                <div class='text-white-50' style='font-size: 0.9rem;'>Entities: ${profile.entity_count}</div>
+                            </div>
+                        </div>
+                        <ul class='mb-2' style='color: #22223b;'>`;
+                for (const [k, v] of Object.entries(profile.key_metrics)) {
+                    html += `<li><span class='fw-bold'>${k.replace(/_/g, ' ')}:</span> ${typeof v === 'number' ? v.toFixed(2) : v}</li>`;
+                }
+                html += `</ul>`;
+                if (profile.representative_entities && profile.representative_entities.length) {
+                    html += `<div class='mt-2'><span class='badge bg-light text-dark'>Examples:</span> ` + profile.representative_entities.map(e => `<span class='badge bg-dark ms-1'>${e.name}</span>`).join('') + `</div>`;
+                }
+                html += `</div></div>`;
+            });
+            html += `</div>`;
+            // --- Entity Assignments Table (Animated, with tooltips) ---
+            html += `<h5 class='mb-2 mt-3'><i class='fas fa-table me-2'></i>Entity Assignments</h5><div class='table-responsive mb-4' style='max-height:350px;overflow:auto;'><table class='table table-sm table-bordered align-middle animated-table'><thead class='table-light'><tr>`;
             if (data.entity_assignments.length) {
                 Object.keys(data.entity_assignments[0]).forEach(k => {
                     html += `<th>${k.replace(/_/g, ' ')}</th>`;
                 });
             }
             html += `</tr></thead><tbody>`;
-            data.entity_assignments.forEach(e => {
-                html += `<tr>`;
-                Object.values(e).forEach(v => {
-                    html += `<td>${typeof v === 'number' ? v.toFixed(2) : v}</td>`;
+            data.entity_assignments.forEach((e, rowIdx) => {
+                html += `<tr class='fade-in-row' style='animation-delay:${rowIdx * 0.04}s;'>`;
+                Object.entries(e).forEach(([k, v]) => {
+                    if (k === 'cluster_id' && clusterProfileMap[v]) {
+                        // Add info icon with tooltip for cluster description
+                        html += `<td><span class='badge bg-primary'>${v}</span> <span class='ms-1' data-bs-toggle='tooltip' title='${clusterProfileMap[v].description || clusterProfileMap[v].cluster_name}'>
+                            <i class='fas fa-info-circle text-info'></i></span></td>`;
+                    } else if (typeof v === 'number') {
+                        html += `<td><span class='badge bg-primary'>${v.toFixed(2)}</span></td>`;
+                    } else if (typeof v === 'string' && v.length < 20) {
+                        html += `<td><span class='badge bg-secondary'>${v}</span></td>`;
+                    } else {
+                        html += `<td>${v}</td>`;
+                    }
                 });
                 html += `</tr>`;
             });
             html += `</tbody></table></div>`;
-            // Recommendations
+            // --- Recommendations as Notification Cards ---
             if (data.recommendations && data.recommendations.length) {
-                html += `<h6>Recommendations</h6><ul>` + data.recommendations.map(r => `<li><b>${r.title || r.action || r.recommendation_type}:</b> ${r.description || r.reason || ''} <span class='text-muted'>${r.expected_impact ? 'Impact: ' + r.expected_impact : ''}</span></li>`).join('') + `</ul>`;
+                html += `<h5 class='mb-2 mt-3'><i class='fas fa-bolt me-2'></i>Recommendations</h5><div class='row'>` + data.recommendations.map((r, idx) => {
+                    const alertColors = ['success','info','warning','danger','primary'];
+                    return `<div class='col-md-6 mb-2'><div class='alert alert-${alertColors[idx % alertColors.length]} animate-in'><i class='fas fa-robot me-2'></i><b>${r.title || r.action || r.recommendation_type}:</b> ${r.description || r.reason || ''} <span class='text-muted'>${r.expected_impact ? 'Impact: ' + r.expected_impact : ''}</span></div></div>`;
+                }).join('') + `</div>`;
             }
             container.innerHTML = html;
+            // Animate numbers
+            setTimeout(() => {
+                document.querySelectorAll('[data-animate-number]').forEach(el => {
+                    const end = parseFloat(el.getAttribute('data-animate-number'));
+                    let start = 0;
+                    const duration = 900;
+                    const step = (timestamp, startTimestamp) => {
+                        if (!startTimestamp) startTimestamp = timestamp;
+                        const progress = Math.min((timestamp - startTimestamp) / duration, 1);
+                        const value = start + (end - start) * progress;
+                        el.textContent = value.toFixed(3);
+                        if (progress < 1) {
+                            window.requestAnimationFrame(ts => step(ts, startTimestamp));
+                        }
+                    };
+                    window.requestAnimationFrame(step);
+                });
+            }, 200);
+            // After rendering, enable Bootstrap tooltips
+            setTimeout(() => {
+                if (window.bootstrap && window.bootstrap.Tooltip) {
+                    document.querySelectorAll('[data-bs-toggle="tooltip"]').forEach(el => {
+                        new window.bootstrap.Tooltip(el);
+                    });
+                }
+            }, 300);
+        }
+
+        function updateSelectedDisplay(containerId, items, removeFunction) {
+            const container = document.getElementById(containerId);
+            container.innerHTML = '';
+            items.forEach((item, index) => {
+                const span = document.createElement('span');
+                span.className = 'selected-item';
+                span.innerHTML = `
+                    ${item.name}
+                    <button class="remove-btn" onclick="${removeFunction.name}(${index})">×</button>
+                `;
+                container.appendChild(span);
+            });
+        }
+        window.updateSelectedDisplay = updateSelectedDisplay;
+
+        // --- Real-time Inventory Recommendations Polling ---
+        let inventoryRecPollingInterval = null;
+
+        function startInventoryRecommendationPolling() {
+            // Stop any previous polling
+            if (inventoryRecPollingInterval) clearInterval(inventoryRecPollingInterval);
+            // Immediately fetch once
+            fetchAndDisplayInventoryRecommendations();
+            // Poll every 30 seconds
+            inventoryRecPollingInterval = setInterval(fetchAndDisplayInventoryRecommendations, 30000);
+        }
+
+        function stopInventoryRecommendationPolling() {
+            if (inventoryRecPollingInterval) clearInterval(inventoryRecPollingInterval);
+        }
+
+        async function fetchAndDisplayInventoryRecommendations() {
+            // Use your current selection variables
+            const cityIds = (typeof selectedCities !== 'undefined') ? selectedCities.map(c => c.id) : [];
+            const storeIds = (typeof selectedStores !== 'undefined') ? selectedStores.map(s => s.id) : [];
+            const productIds = (typeof selectedProducts !== 'undefined') ? selectedProducts.map(p => parseInt(p.id)) : [];
+            if (!cityIds.length || !storeIds.length || !productIds.length) {
+                displayInventoryRecommendations([]);
+                return;
+            }
+            try {
+                const response = await fetch('/api/demand-forecast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        city_ids: cityIds,
+                        store_ids: storeIds,
+                        product_ids: productIds,
+                        forecast_days: 30 // or your current value
+                    })
+                });
+                if (!response.ok) throw new Error('Failed to fetch recommendations');
+                const data = await response.json();
+                displayInventoryRecommendations(data.inventory_recommendations || []);
+            } catch (err) {
+                console.error('Error fetching inventory recommendations:', err);
+            }
+        }
+        // --- End Real-time Polling ---
+
+        // --- Hook polling to selection changes ---
+        // Call startInventoryRecommendationPolling() whenever selection changes
+        // For example, after addCity, addStore, addProduct, removeCity, removeStore, removeProduct
+        window._origAddCity = window.addCity;
+        window.addCity = function() { window._origAddCity.apply(this, arguments); startInventoryRecommendationPolling(); };
+        window._origAddStore = window.addStore;
+        window.addStore = function() { window._origAddStore.apply(this, arguments); startInventoryRecommendationPolling(); };
+        window._origAddProduct = window.addProduct;
+        window.addProduct = function() { window._origAddProduct.apply(this, arguments); startInventoryRecommendationPolling(); };
+        window._origRemoveCity = window.removeCity;
+        window.removeCity = function() { window._origRemoveCity.apply(this, arguments); startInventoryRecommendationPolling(); };
+        window._origRemoveStore = window.removeStore;
+        window.removeStore = function() { window._origRemoveStore.apply(this, arguments); startInventoryRecommendationPolling(); };
+        window._origRemoveProduct = window.removeProduct;
+        window.removeProduct = function() { window._origRemoveProduct.apply(this, arguments); startInventoryRecommendationPolling(); };
+        // --- End Hook ---
+
+        // --- Real-time Demand Insights & Alerts Polling ---
+        let demandInsightsPollingInterval = null;
+
+        function startDemandInsightsPolling() {
+            if (demandInsightsPollingInterval) clearInterval(demandInsightsPollingInterval);
+            fetchAndDisplayDemandInsights();
+            demandInsightsPollingInterval = setInterval(fetchAndDisplayDemandInsights, 30000);
+        }
+
+        function stopDemandInsightsPolling() {
+            if (demandInsightsPollingInterval) clearInterval(demandInsightsPollingInterval);
+        }
+
+        async function fetchAndDisplayDemandInsights() {
+            const cityIds = (typeof selectedCities !== 'undefined') ? selectedCities.map(c => c.id) : [];
+            const storeIds = (typeof selectedStores !== 'undefined') ? selectedStores.map(s => s.id) : [];
+            const productIds = (typeof selectedProducts !== 'undefined') ? selectedProducts.map(p => parseInt(p.id)) : [];
+            if (!cityIds.length || !storeIds.length || !productIds.length) {
+                displayDemandInsights([]);
+                return;
+            }
+            try {
+                const response = await fetch('/api/demand-forecast', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({
+                        city_ids: cityIds,
+                        store_ids: storeIds,
+                        product_ids: productIds,
+                        forecast_days: 30
+                    })
+                });
+                if (!response.ok) throw new Error('Failed to fetch demand insights');
+                const data = await response.json();
+                displayDemandInsights(data.demand_insights || []);
+            } catch (err) {
+                console.error('Error fetching demand insights:', err);
+            }
+        }
+        // --- End Real-time Polling ---
+
+        // --- Hook polling to selection changes ---
+        window._origAddCity_DI = window.addCity;
+        window.addCity = function() { window._origAddCity_DI.apply(this, arguments); startDemandInsightsPolling(); };
+        window._origAddStore_DI = window.addStore;
+        window.addStore = function() { window._origAddStore_DI.apply(this, arguments); startDemandInsightsPolling(); };
+        window._origAddProduct_DI = window.addProduct;
+        window.addProduct = function() { window._origAddProduct_DI.apply(this, arguments); startDemandInsightsPolling(); };
+        window._origRemoveCity_DI = window.removeCity;
+        window.removeCity = function() { window._origRemoveCity_DI.apply(this, arguments); startDemandInsightsPolling(); };
+        window._origRemoveStore_DI = window.removeStore;
+        window.removeStore = function() { window._origRemoveStore_DI.apply(this, arguments); startDemandInsightsPolling(); };
+        window._origRemoveProduct_DI = window.removeProduct;
+        window.removeProduct = function() { window._origRemoveProduct_DI.apply(this, arguments); startDemandInsightsPolling(); };
+        // --- End Hook ---
+
+        // Advanced Store Clustering UI (replace or enhance updateClusteringUI)
+        function updateClusteringUI(data) {
+            const storeName = document.getElementById('storeSelect').options[document.getElementById('storeSelect').selectedIndex].text;
+            document.getElementById('clustering-summary').textContent = 
+                `Store clustering analysis for ${storeName} showing behavioral patterns and performance characteristics.`;
+            // Advanced Quality Metrics
+            if (data.quality_metrics) {
+                const qm = data.quality_metrics;
+                const metricsRow = document.createElement('div');
+                metricsRow.className = 'row g-3 mb-3 clustering-quality-advanced animate-in';
+                metricsRow.innerHTML = `
+                    <div class="col-6 col-md-2"><div class="stat-advanced-card gradient-blue shadow-sm" title="Silhouette Score"><div class="stat-icon-advanced"><i class="fas fa-project-diagram"></i></div><div class="stat-value-advanced" id="qmSilhouette">0</div><div class="stat-label-advanced">Silhouette</div></div></div>
+                    <div class="col-6 col-md-2"><div class="stat-advanced-card gradient-purple shadow-sm" title="Calinski-Harabasz Score"><div class="stat-icon-advanced"><i class="fas fa-chart-bar"></i></div><div class="stat-value-advanced" id="qmCH">0</div><div class="stat-label-advanced">Calinski-Harabasz</div></div></div>
+                    <div class="col-6 col-md-2"><div class="stat-advanced-card gradient-orange shadow-sm" title="Inertia"><div class="stat-icon-advanced"><i class="fas fa-bullseye"></i></div><div class="stat-value-advanced" id="qmInertia">0</div><div class="stat-label-advanced">Inertia</div></div></div>
+                    <div class="col-6 col-md-2"><div class="stat-advanced-card gradient-green shadow-sm" title="Avg Cluster Size"><div class="stat-icon-advanced"><i class="fas fa-users"></i></div><div class="stat-value-advanced" id="qmAvgSize">0</div><div class="stat-label-advanced">Avg Size</div></div></div>
+                    <div class="col-6 col-md-2"><div class="stat-advanced-card gradient-teal shadow-sm" title="Cluster Size Stddev"><div class="stat-icon-advanced"><i class="fas fa-chart-area"></i></div><div class="stat-value-advanced" id="qmStdSize">0</div><div class="stat-label-advanced">Size Stddev</div></div></div>
+                    <div class="col-6 col-md-2"><div class="stat-advanced-card gradient-red shadow-sm" title="Min/Max Cluster Size"><div class="stat-icon-advanced"><i class="fas fa-sort-numeric-up"></i></div><div class="stat-value-advanced" id="qmMinMaxSize">0/0</div><div class="stat-label-advanced">Min/Max Size</div></div></div>
+                `;
+                const parent = document.getElementById('storeClusteringResults');
+                parent.innerHTML = '';
+                parent.appendChild(metricsRow);
+                setTimeout(() => {
+                    document.getElementById('qmSilhouette').textContent = qm.silhouette_score.toFixed(3);
+                    document.getElementById('qmCH').textContent = qm.calinski_harabasz_score.toFixed(3);
+                    document.getElementById('qmInertia').textContent = qm.inertia.toFixed(3);
+                    document.getElementById('qmAvgSize').textContent = qm.avg_cluster_size.toFixed(2);
+                    document.getElementById('qmStdSize').textContent = qm.cluster_size_std.toFixed(2);
+                    document.getElementById('qmMinMaxSize').textContent = `${qm.min_cluster_size.toFixed(0)}/${qm.max_cluster_size.toFixed(0)}`;
+                }, 200);
+            }
+            // Summary
+            if (data.summary) {
+                const summaryCard = document.createElement('div');
+                summaryCard.className = 'stat-advanced-card gradient-blue shadow-sm animate-in mb-3';
+                summaryCard.innerHTML = `<div class='stat-icon-advanced'><i class='fas fa-info-circle'></i></div><div class='stat-label-advanced mb-2'>${data.summary}</div>`;
+                document.getElementById('storeClusteringResults').appendChild(summaryCard);
+            }
+            // Cluster Profiles
+            if (data.cluster_profiles && Array.isArray(data.cluster_profiles)) {
+                const profilesRow = document.createElement('div');
+                profilesRow.className = 'row g-3 mb-3';
+                data.cluster_profiles.forEach((profile, idx) => {
+                    const card = document.createElement('div');
+                    card.className = 'col-md-4';
+                    card.innerHTML = `<div class='stat-advanced-card gradient-purple shadow-sm animate-in' title='${profile.cluster_name} Profile'><div class='stat-icon-advanced'><i class='fas fa-layer-group'></i></div><div class='stat-value-advanced'>${profile.cluster_name}</div><div class='stat-label-advanced'>Entities: ${profile.entity_count}</div><ul class='mb-0 mt-2'>${Object.entries(profile.key_metrics).map(([k, v]) => `<li><strong>${k.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}:</strong> ${typeof v === 'number' ? v.toFixed(2) : v}</li>`).join('')}</ul></div>`;
+                    profilesRow.appendChild(card);
+                });
+                document.getElementById('storeClusteringResults').appendChild(profilesRow);
+            }
+            // Entity Assignments
+            if (data.entity_assignments && Array.isArray(data.entity_assignments)) {
+                const table = document.createElement('table');
+                table.className = 'table table-hover table-striped animate-in';
+                table.innerHTML = `<thead><tr><th>Entity ID</th><th>Name</th><th>Cluster</th><th>Cluster Name</th><th>Similarity</th><th>Key Attributes</th></tr></thead><tbody>${data.entity_assignments.map(entity => `<tr><td>${entity.entity_id}</td><td>${entity.entity_name}</td><td><span class='badge bg-primary'>${entity.cluster_id}</span></td><td>${entity.cluster_name}</td><td><span class='badge bg-info'>${(entity.similarity_score * 100).toFixed(1)}%</span></td><td>${Object.entries(entity.key_attributes).map(([key, value]) => `<span class='badge bg-secondary me-1'>${key.replace(/_/g, ' ').replace(/\b\w/g, l => l.toUpperCase())}: ${typeof value === 'number' ? value.toFixed(2) : value}</span>`).join('')}</td></tr>`).join('')}</tbody>`;
+                document.getElementById('storeClusteringResults').appendChild(table);
+            }
+            // Recommendations
+            if (data.recommendations && Array.isArray(data.recommendations)) {
+                const recsRow = document.createElement('div');
+                recsRow.className = 'row g-2 mt-3';
+                data.recommendations.forEach(rec => {
+                    const card = document.createElement('div');
+                    card.className = 'col-md-6';
+                    card.innerHTML = `<div class='alert alert-success animate-in'><i class='fas fa-check-circle me-2'></i>${rec}</div>`;
+                    recsRow.appendChild(card);
+                });
+                document.getElementById('storeClusteringResults').appendChild(recsRow);
+            }
         }
     </script>
+    <!-- Ensure global scope for addCity and related functions -->
+    <script>
+        window.addCity = addCity;
+        window.removeCity = removeCity;
+        window.addStore = addStore;
+        window.removeStore = removeStore;
+        window.addProduct = addProduct;
+        window.removeProduct = removeProduct;
+    </script>
+    <!-- Add sound for notifications -->
+    <audio id="demandAlertSound" src="https://cdn.pixabay.com/audio/2022/07/26/audio_124bfae1e2.mp3" preload="auto"></audio>
 </body>
 </html>
