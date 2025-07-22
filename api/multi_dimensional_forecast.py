@@ -89,6 +89,7 @@ class InventoryStatus(BaseModel):
     stockout_risk_score: float
     days_until_stockout: int
     recommended_reorder_quantity: int
+    supplier_lead_time: Optional[int]
 
 
 class DemandForecastInsight(BaseModel):
@@ -239,6 +240,7 @@ async def get_inventory_status(
                             stockout_risk_score=stockout_risk_score,
                             days_until_stockout=days_until_stockout,
                             recommended_reorder_quantity=recommended_reorder,
+                            supplier_lead_time=None,
                         )
                     )
 
@@ -1306,6 +1308,28 @@ def generate_inventory_recommendations(
                 }
             )
 
+        # --- NEW: Supplier management per product/store with high lead time or frequent stockouts ---
+        # For demo, assume high lead time if days_until_stockout < 7 and stockout_frequency > 0.3
+        supplier_issues = [
+            item for item in inventory_status if (getattr(item, 'supplier_lead_time', 0) and item.supplier_lead_time > 7) or item.stockout_frequency > 0.3
+        ]
+        for item in supplier_issues:
+            recommendations.append({
+                "type": "supplier_management",
+                "priority": "medium",
+                "title": f"Supplier Optimization for {item.product_name} ({item.store_name})",
+                "description": f"Improve supplier performance for {item.product_name} in {item.store_name} (lead time: {getattr(item, 'supplier_lead_time', 'N/A')} days, stockout freq: {item.stockout_frequency:.2f})",
+                "action_items": [
+                    f"Negotiate shorter lead times for {item.product_name}",
+                    f"Establish backup suppliers for {item.product_name} in {item.store_name}",
+                    f"Implement vendor-managed inventory for {item.product_name}",
+                    f"Monitor supplier performance for {item.product_name}"
+                ],
+                "estimated_impact": int(item.avg_daily_demand * 30 * 2),
+                "affected_products": [item.product_name],
+                "affected_stores": [item.store_name],
+            })
+
         # Demand forecasting improvements
         recommendations.append(
             {
@@ -1325,13 +1349,13 @@ def generate_inventory_recommendations(
             }
         )
 
-        # Supplier relationship management
+        # General supplier relationship management (process-wide)
         recommendations.append(
             {
                 "type": "supplier_management",
                 "priority": "medium",
                 "title": "Supplier Relationship Optimization",
-                "description": "Improve supplier performance and reduce lead times",
+                "description": "Improve supplier performance and reduce lead times across all products/stores",
                 "action_items": [
                     "Negotiate shorter lead times with key suppliers",
                     "Establish backup suppliers for critical items",
@@ -1341,6 +1365,8 @@ def generate_inventory_recommendations(
                 "estimated_impact": sum(
                     item.recommended_reorder_quantity * 2 for item in inventory_status
                 ),
+                "affected_products": list({item.product_name for item in inventory_status}),
+                "affected_stores": list({item.store_name for item in inventory_status}),
             }
         )
 
