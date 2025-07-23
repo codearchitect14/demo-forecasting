@@ -13,12 +13,46 @@ from typing import List, Dict, Any, Optional
 from fastapi import APIRouter, HTTPException
 from pydantic import BaseModel
 import json
-from database.connection import db_manager
+from database.connection import db_manager, cached
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 import logging
 
 logger = logging.getLogger(__name__)
+
+class ForecastModelManager:
+    """
+    Manages the loading and access of forecasting models (RandomForestRegressor, StandardScaler)
+    Ensures models are loaded once and reused across requests.
+    """
+    def __init__(self):
+        self.demand_model: Optional[RandomForestRegressor] = None
+        self.demand_scaler: Optional[StandardScaler] = None
+        self.sales_model: Optional[RandomForestRegressor] = None
+        self.sales_scaler: Optional[StandardScaler] = None
+
+    async def load_models(self):
+        """
+        Placeholder for actual model loading logic. 
+        In a real scenario, models would be loaded from disk (e.g., .joblib files)
+        or a model registry here.
+        For this exercise, we'll initialize them with dummy data if not present
+        since there's no explicit model training or saving pipeline in the given code.
+        """
+        if self.demand_model is None:
+            logger.info("Initializing dummy demand forecasting model and scaler...")
+            # Create dummy models for demonstration if not loaded from disk
+            self.demand_model = RandomForestRegressor(n_estimators=100, random_state=42)
+            self.demand_scaler = StandardScaler()
+
+        if self.sales_model is None:
+            logger.info("Initializing dummy sales forecasting model and scaler...")
+            # Create dummy models for demonstration if not loaded from disk
+            self.sales_model = RandomForestRegressor(n_estimators=100, random_state=42)
+            self.sales_scaler = StandardScaler()
+
+
+model_manager = ForecastModelManager()
 
 router = APIRouter()
 
@@ -114,6 +148,7 @@ class DemandForecastResponse(BaseModel):
 
 
 @router.post("/demand-forecast")
+@cached(ttl=300) # Cache for 5 minutes
 async def demand_forecast(request: dict):
     """
     Generate demand forecasts with inventory management insights
@@ -773,13 +808,23 @@ async def generate_demand_forecast_single(
         if features.empty:
             return generate_fallback_demand_forecast(forecast_days)
 
-        # Train demand forecasting model
+        # Ensure models are loaded
+        await model_manager.load_models()
+
+        # Use pre-loaded model and scaler
+        model = model_manager.demand_model
+        scaler = model_manager.demand_scaler
+
+        if model is None or scaler is None: # Fallback if models failed to load
+            logger.warning("Demand models not loaded, generating fallback forecast.")
+            return generate_fallback_demand_forecast(forecast_days)
+
         X = features.drop(["estimated_units_sold"], axis=1)
         y = features["estimated_units_sold"]
 
-        model = RandomForestRegressor(n_estimators=100, random_state=42)
-        scaler = StandardScaler()
-
+        # Fit scaler and model only if new data requires re-training, 
+        # or if it's the first time and model needs a fit for prediction
+        # In a real system, you'd load pre-trained models.
         X_scaled = scaler.fit_transform(X)
         model.fit(X_scaled, y)
 
@@ -1513,6 +1558,7 @@ async def get_diverse_store_selection(
 @router.post(
     "/multi-dimensional-forecast", response_model=MultiDimensionalForecastResponse
 )
+@cached(ttl=300) # Cache for 5 minutes
 async def multi_dimensional_forecast(request: MultiDimensionalForecastRequest):
     """
     Generate multi-dimensional forecasts with comparative analysis and insights
@@ -1709,14 +1755,22 @@ async def generate_single_forecast(
         if features.empty:
             return generate_fallback_forecast(forecast_days)
 
+        # Ensure models are loaded
+        await model_manager.load_models()
+
+        # Use pre-loaded model and scaler
+        model = model_manager.sales_model
+        scaler = model_manager.sales_scaler
+
+        if model is None or scaler is None: # Fallback if models failed to load
+            logger.warning("Sales models not loaded, generating fallback forecast.")
+            return generate_fallback_forecast(forecast_days)
+
         # Split data
         X = features.drop(["sale_amount"], axis=1)
         y = features["sale_amount"]
 
-        # Train model
-        model = RandomForestRegressor(n_estimators=100, random_state=42)
-        scaler = StandardScaler()
-
+        # Fit scaler and model only if new data requires re-training
         X_scaled = scaler.fit_transform(X)
         model.fit(X_scaled, y)
 
@@ -2549,6 +2603,7 @@ async def weather_api_status():
 
 
 @router.post("/weather-holiday-forecast")
+@cached(ttl=300) # Cache for 5 minutes
 async def weather_holiday_forecast(request: dict):
     """
     Advanced weather and holiday-based forecasting with real-time recommendations

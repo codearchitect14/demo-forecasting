@@ -112,6 +112,10 @@ class DatabaseManager:
             if self.is_cache_valid(timestamp):
                 logger.debug(f"Cache hit for query: {query[:50]}...")
                 return cached_result
+            else:
+                logger.debug(f"Cache expired for query: {query[:50]}... Cache miss.")
+        else:
+            logger.debug(f"Cache miss for query: {query[:50]}...")
 
         # Execute query
         async with self.get_connection() as conn:
@@ -738,7 +742,12 @@ def cached(ttl: int = 300):
             ):
                 cached_result, timestamp = db_manager.query_cache[cache_key]
                 if db_manager.is_cache_valid(timestamp):
+                    logger.info(f"Cache hit for function {func.__name__} with key: {cache_key}")
                     return cached_result
+                else:
+                    logger.info(f"Cache expired for function {func.__name__}. Cache miss with key: {cache_key}")
+            else:
+                logger.info(f"Cache miss for function {func.__name__} with key: {cache_key}")
 
             result = await func(*args, **kwargs)
             if hasattr(db_manager, "query_cache"):

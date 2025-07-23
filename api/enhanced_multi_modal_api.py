@@ -22,6 +22,7 @@ from services.dynamic_category_service import DynamicCategoryService
 from services.dynamic_store_service import DynamicStoreService
 from services.real_time_alerts_service import RealTimeAlertsService
 from utils.logger import get_logger
+from database.connection import cached
 
 logger = get_logger(__name__)
 
@@ -123,6 +124,7 @@ class StockoutPredictionRequest(BaseModel):
 
 
 @router.post("/forecast")
+@cached(ttl=300)
 async def enhanced_forecast(request: EnhancedForecastRequest):
     """Enhanced sales forecasting with multiple model options"""
     try:
@@ -184,6 +186,7 @@ async def enhanced_forecast(request: EnhancedForecastRequest):
 
 
 @router.post("/ensemble-forecast")
+@cached(ttl=300)
 async def ensemble_forecast(request: EnsembleForecastRequest):
     """Ensemble model forecasting with weighted combinations"""
     try:
@@ -227,11 +230,6 @@ async def ensemble_forecast(request: EnsembleForecastRequest):
                     request.rf_weight,
                 ],
             },
-            "weights_used": {
-                "prophet": request.prophet_weight,
-                "xgboost": request.xgboost_weight,
-                "random_forest": request.rf_weight,
-            },
             "insights": {
                 "ensemble_accuracy": f"{ensemble_accuracy}%",
                 "best_model": models[accuracy_scores.index(max(accuracy_scores))],
@@ -258,6 +256,7 @@ async def ensemble_forecast(request: EnsembleForecastRequest):
 
 
 @router.post("/cross-store-comparison")
+@cached(ttl=300)
 async def cross_store_comparison(request: CrossStoreComparisonRequest):
     """Cross-store performance analysis with real-time data"""
     try:
@@ -548,6 +547,7 @@ async def cross_store_comparison(request: CrossStoreComparisonRequest):
 
 
 @router.post("/weather-correlation")
+@cached(ttl=300)
 async def weather_correlation_analysis(request: WeatherCorrelationRequest):
     """
     🌤️ COMPREHENSIVE MULTI-MODAL WEATHER INTELLIGENCE SYSTEM
@@ -1263,6 +1263,7 @@ async def generate_intelligent_weather_analysis(request):
 
 
 @router.post("/promotion-impact")
+@cached(ttl=300)
 async def promotion_impact_analysis(request: PromotionImpactRequest):
     """Enhanced promotion impact analysis with optimization insights"""
     try:
@@ -1397,6 +1398,7 @@ async def promotion_impact_analysis(request: PromotionImpactRequest):
 
 
 @router.post("/stockout-prediction")
+@cached(ttl=300)
 async def stockout_prediction_analysis(request: StockoutPredictionRequest):
     """Enhanced stockout risk prediction with optimization recommendations"""
     try:
@@ -1483,6 +1485,7 @@ async def stockout_prediction_analysis(request: StockoutPredictionRequest):
 
 
 @router.get("/dynamic-insights/{city_id}/{store_id}/{product_id}")
+@cached(ttl=300)
 async def get_dynamic_insights(city_id: int, store_id: int, product_id: int):
     """Get real-time calculated insights to replace all hardcoded frontend values"""
     try:
@@ -1734,6 +1737,7 @@ async def get_dynamic_insights(city_id: int, store_id: int, product_id: int):
 
 
 @router.get("/curated-data")
+@cached(ttl=300)
 async def get_curated_data():
     """Get curated list of all 18 cities, select 25 stores, and 15 products for frontend"""
     try:
@@ -1910,6 +1914,7 @@ async def get_curated_data():
 
 
 @router.post("/weather-demand-forecasting")
+@cached(ttl=300)
 async def weather_demand_forecasting(request: Dict[str, Any]):
     """
     🌤️ ADVANCED WEATHER-BASED DEMAND FORECASTING
@@ -2088,6 +2093,7 @@ async def weather_demand_forecasting(request: Dict[str, Any]):
 
 
 @router.post("/weather-promotion-optimization")
+@cached(ttl=300)
 async def weather_promotion_optimization(request: Dict[str, Any]):
     """
     🌤️ WEATHER-PROMOTION OPTIMIZATION ENGINE
@@ -2240,6 +2246,7 @@ async def weather_promotion_optimization(request: Dict[str, Any]):
 
 
 @router.post("/weather-risk-assessment")
+@cached(ttl=300)
 async def weather_risk_assessment(request: Dict[str, Any]):
     """
     🌤️ COMPREHENSIVE WEATHER RISK ASSESSMENT
@@ -2359,6 +2366,7 @@ async def weather_risk_assessment(request: Dict[str, Any]):
 
 
 @router.post("/weather-scenario-planning")
+@cached(ttl=300)
 async def weather_scenario_planning(request: Dict[str, Any]):
     """
     🌤️ ADVANCED WEATHER SCENARIO PLANNING
