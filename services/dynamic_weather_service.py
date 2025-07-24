@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, List
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from database.connection import get_pool
+from fastapi import Request
 
 logger = logging.getLogger(__name__)
 
@@ -22,6 +22,7 @@ class DynamicWeatherService:
 
     async def get_weather_data(
         self,
+        request: Request,
         store_id: Optional[int] = None,
         product_id: Optional[int] = None,
         city_id: Optional[int] = None,
@@ -29,7 +30,7 @@ class DynamicWeatherService:
     ) -> pd.DataFrame:
         """Fetch actual weather and sales data from database."""
 
-        pool = await get_pool()
+        manager = request.app.state.db_manager
 
         query = """
         SELECT 
@@ -69,7 +70,7 @@ class DynamicWeatherService:
         query += f" ORDER BY sd.dt DESC LIMIT ${len(params) + 1}"
         params.append(limit)
 
-        async with pool.acquire() as connection:
+        async with manager.get_connection() as connection:
             rows = await connection.fetch(query, *params)
 
         if not rows:
@@ -81,6 +82,7 @@ class DynamicWeatherService:
 
     async def analyze_weather_sensitivity(
         self,
+        request: Request,
         store_id: Optional[int] = None,
         product_id: Optional[int] = None,
         city_id: Optional[int] = None,
@@ -89,7 +91,7 @@ class DynamicWeatherService:
 
         try:
             # Get actual data
-            df = await self.get_weather_data(store_id, product_id, city_id)
+            df = await self.get_weather_data(request, store_id, product_id, city_id)
 
             if df.empty:
                 return {"error": "No data found for the specified criteria"}
@@ -358,6 +360,7 @@ class DynamicWeatherService:
 
     async def get_weather_forecast_impact(
         self,
+        request: Request,
         store_id: Optional[int] = None,
         product_id: Optional[int] = None,
         weather_scenario: Dict[str, float] = None,
@@ -373,7 +376,7 @@ class DynamicWeatherService:
             }
 
         # Get historical data
-        df = await self.get_weather_data(store_id, product_id, limit=500)
+        df = await self.get_weather_data(request, store_id, product_id, limit=500)
 
         if df.empty:
             return {"error": "No historical data for prediction"}

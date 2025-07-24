@@ -11,10 +11,11 @@ import logging
 import asyncio
 from pathlib import Path
 import json
+from fastapi import Request # Import Request
 
 # Import custom modules
 from models.weather_demand_model import WeatherSensitiveDemandModel
-from database.connection import get_pool, cached, paginate
+# from database.connection import get_pool, cached, paginate # Removed
 from services.data_preprocessor import DataPreprocessor
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ class WeatherDemandService:
         """Initialize the weather demand service."""
         self.model = None
         self.preprocessor = DataPreprocessor()
-        self.cache_duration = 3600  # 1 hour cache
+        self.cache_duration = 3600  # 1 hour cache - Note: Caching logic needs to be re-evaluated after removing @cached decorator from database.connection
 
     def get_or_create_model(
         self, model_type: str = "gradient_boost"
@@ -48,9 +49,10 @@ class WeatherDemandService:
 
         return self.model
 
-    @cached("weather_data")
+    # @cached("weather_data") # Removed, caching will be handled via DatabaseManager.execute_cached_query
     async def fetch_weather_sales_data(
         self,
+        request: Request, # Add request
         store_id: Optional[int] = None,
         product_id: Optional[int] = None,
         category_id: Optional[int] = None,
@@ -76,7 +78,7 @@ class WeatherDemandService:
         Returns:
             List of dictionaries with sales and weather data
         """
-        pool = await get_pool()
+        manager = request.app.state.db_manager # Access db_manager
 
         query = """
         SELECT 
@@ -147,13 +149,14 @@ class WeatherDemandService:
             query += f" OFFSET ${param_count}"
             params.append(offset)
 
-        async with pool.acquire() as connection:
+        async with manager.get_connection() as connection: # Use manager's connection
             rows = await connection.fetch(query, *params)
             return [dict(row) for row in rows]
 
-    @cached("weather_analysis")
+    # @cached("weather_analysis") # Removed
     async def analyze_weather_sensitivity(
         self,
+        request: Request, # Add request
         store_id: Optional[int] = None,
         product_id: Optional[int] = None,
         category_id: Optional[int] = None,
@@ -180,6 +183,7 @@ class WeatherDemandService:
         try:
             # Fetch data
             data = await self.fetch_weather_sales_data(
+                request, # Pass request
                 store_id=store_id,
                 product_id=product_id,
                 category_id=category_id,
@@ -279,6 +283,7 @@ class WeatherDemandService:
 
     async def train_weather_model(
         self,
+        request: Request, # Add request
         model_type: str = "gradient_boost",
         store_id: Optional[int] = None,
         category_id: Optional[int] = None,
@@ -305,6 +310,7 @@ class WeatherDemandService:
         try:
             # Fetch training data
             data = await self.fetch_weather_sales_data(
+                request, # Pass request
                 store_id=store_id,
                 category_id=category_id,
                 city_id=city_id,
@@ -354,6 +360,7 @@ class WeatherDemandService:
 
     async def forecast_weather_demand(
         self,
+        request: Request, # Add request
         store_id: Optional[int] = None,
         product_id: Optional[int] = None,
         category_id: Optional[int] = None,
@@ -395,6 +402,7 @@ class WeatherDemandService:
             )  # 3 months of history
 
             historical_data = await self.fetch_weather_sales_data(
+                request, # Pass request
                 store_id=store_id,
                 product_id=product_id,
                 category_id=category_id,
@@ -517,6 +525,7 @@ class WeatherDemandService:
 
     async def analyze_weather_impact(
         self,
+        request: Request, # Add request
         weather_variable: str,
         impact_range: Tuple[float, float],
         store_id: Optional[int] = None,
@@ -556,6 +565,7 @@ class WeatherDemandService:
                 )
 
             reference_data = await self.fetch_weather_sales_data(
+                request, # Pass request
                 store_id=store_id,
                 product_id=product_id,
                 category_id=category_id,
@@ -642,9 +652,10 @@ class WeatherDemandService:
             logger.error(f"Error in weather impact analysis: {str(e)}")
             return {"error": f"Impact analysis failed: {str(e)}"}
 
-    @paginate()
+    # @paginate() # Removed
     async def get_weather_correlations(
         self,
+        request: Request, # Add request
         city_id: Optional[int] = None,
         category_id: Optional[int] = None,
         start_date: Optional[str] = None,
@@ -666,7 +677,7 @@ class WeatherDemandService:
         Returns:
             Weather correlation data
         """
-        pool = await get_pool()
+        manager = request.app.state.db_manager # Access db_manager
 
         query = """
         SELECT 
@@ -726,6 +737,6 @@ class WeatherDemandService:
             query += f" OFFSET ${param_count}"
             params.append(offset)
 
-        async with pool.acquire() as connection:
+        async with manager.get_connection() as connection: # Use manager's connection
             rows = await connection.fetch(query, *params)
             return [dict(row) for row in rows]

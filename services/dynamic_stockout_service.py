@@ -9,7 +9,8 @@ from typing import Dict, Any, Optional, List
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from database.connection import get_pool
+from fastapi import Request
+# from database.connection import get_pool # Removed
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +23,14 @@ class DynamicStockoutService:
 
     async def get_stockout_data(
         self,
+        request: Request, # Add request
         store_id: Optional[int] = None,
         product_id: Optional[int] = None,
         limit: int = 1000,
     ) -> pd.DataFrame:
         """Fetch actual sales and stock data from database."""
 
-        pool = await get_pool()
+        manager = request.app.state.db_manager # Access db_manager
 
         query = """
         SELECT 
@@ -61,7 +63,7 @@ class DynamicStockoutService:
         query += f" ORDER BY sd.dt DESC LIMIT ${len(params) + 1}"
         params.append(limit)
 
-        async with pool.acquire() as connection:
+        async with manager.get_connection() as connection: # Use manager's connection
             rows = await connection.fetch(query, *params)
 
         if not rows:
@@ -72,13 +74,13 @@ class DynamicStockoutService:
         return df
 
     async def analyze_stockout_risk(
-        self, store_id: Optional[int] = None, product_id: Optional[int] = None
+        self, request: Request, store_id: Optional[int] = None, product_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Analyze real stockout risk from database data."""
 
         try:
             # Get actual data
-            df = await self.get_stockout_data(store_id, product_id)
+            df = await self.get_stockout_data(request, store_id, product_id)
 
             if df.empty:
                 return {"error": "No data found for the specified criteria"}
@@ -124,12 +126,12 @@ class DynamicStockoutService:
             return {"error": f"Analysis failed: {str(e)}"}
 
     async def analyze_cross_store_optimization(
-        self, store_id: int, product_id: int, city_id: int = 0
+        self, request: Request, store_id: int, product_id: int, city_id: int = 0
     ) -> Dict[str, Any]:
         """Analyze cross-store optimization opportunities."""
         try:
             df = await self.get_stockout_data(
-                store_id, product_id
+                request, store_id, product_id
             )  # Changed from get_sales_data to get_stockout_data
             if df.empty:
                 return self._generate_simulated_cross_store_optimization()
@@ -147,12 +149,12 @@ class DynamicStockoutService:
             return self._generate_simulated_cross_store_optimization()
 
     async def calculate_dynamic_safety_stock(
-        self, store_id: int, product_id: int, city_id: int = 0, service_level: int = 95
+        self, request: Request, store_id: int, product_id: int, city_id: int = 0, service_level: int = 95
     ) -> Dict[str, Any]:
         """Calculate dynamic safety stock levels."""
         try:
             df = await self.get_stockout_data(
-                store_id, product_id
+                request, store_id, product_id
             )  # Changed from get_sales_data to get_stockout_data
             if df.empty:
                 return self._generate_simulated_safety_stock()
@@ -170,12 +172,12 @@ class DynamicStockoutService:
             return self._generate_simulated_safety_stock()
 
     async def optimize_reorder_parameters(
-        self, store_id: int, product_id: int, city_id: int = 0
+        self, request: Request, store_id: int, product_id: int, city_id: int = 0
     ) -> Dict[str, Any]:
         """Optimize reorder parameters."""
         try:
             df = await self.get_stockout_data(
-                store_id, product_id
+                request, store_id, product_id
             )  # Changed from get_sales_data to get_stockout_data
             if df.empty:
                 return self._generate_simulated_reorder_optimization()

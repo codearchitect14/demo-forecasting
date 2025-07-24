@@ -12,8 +12,9 @@ from decimal import Decimal
 import asyncio
 from dataclasses import dataclass
 import json
+from fastapi import Request # Import Request
 
-from database.connection import get_db_connection
+# from database.connection import get_db_connection # Removed
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -68,15 +69,15 @@ class CompetitiveIntelligenceService:
         }
 
     async def analyze_competitive_landscape(
-        self, city_id: Optional[int] = None
+        self, request: Request, city_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Comprehensive competitive landscape analysis."""
         try:
             # Run parallel competitive analysis tasks
-            competitor_analysis_task = self._analyze_competitor_profiles(city_id)
-            threat_assessment_task = self._assess_market_threats(city_id)
-            opportunity_task = self._identify_competitive_opportunities(city_id)
-            pricing_task = self._analyze_competitive_pricing(city_id)
+            competitor_analysis_task = self._analyze_competitor_profiles(request, city_id)
+            threat_assessment_task = self._assess_market_threats(request, city_id)
+            opportunity_task = self._identify_competitive_opportunities(request, city_id)
+            pricing_task = self._analyze_competitive_pricing(request, city_id)
 
             competitors, threats, opportunities, pricing_analysis = (
                 await asyncio.gather(
@@ -94,7 +95,7 @@ class CompetitiveIntelligenceService:
 
             # Store analysis results
             await self._store_competitive_analysis(
-                city_id, competitors, threats, opportunities, strategic_recommendations
+                request, city_id, competitors, threats, opportunities, strategic_recommendations
             )
 
             return {
@@ -133,12 +134,13 @@ class CompetitiveIntelligenceService:
             raise
 
     async def _analyze_competitor_profiles(
-        self, city_id: Optional[int] = None
+        self, request: Request, city_id: Optional[int] = None
     ) -> List[CompetitorProfile]:
         """Analyze competitor profiles and market positioning."""
         try:
             # Since we don't have actual competitor data, we'll simulate based on market patterns
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:
                 # Analyze market patterns to infer competitive landscape
                 query = (
                     """
@@ -270,13 +272,14 @@ class CompetitiveIntelligenceService:
             return []
 
     async def _assess_market_threats(
-        self, city_id: Optional[int] = None
+        self, request: Request, city_id: Optional[int] = None
     ) -> List[MarketThreat]:
         """Assess current and emerging market threats."""
         try:
             threats = []
 
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:
                 # Analyze sales trends to identify potential threats
                 query = """
                 WITH trend_analysis AS (
@@ -409,13 +412,14 @@ class CompetitiveIntelligenceService:
             return []
 
     async def _identify_competitive_opportunities(
-        self, city_id: Optional[int] = None
+        self, request: Request, city_id: Optional[int] = None
     ) -> List[CompetitiveOpportunity]:
         """Identify competitive opportunities and market gaps."""
         try:
             opportunities = []
 
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:
                 # Analyze underperforming categories for opportunities
                 query = """
                 WITH category_performance AS (
@@ -559,11 +563,12 @@ class CompetitiveIntelligenceService:
             return []
 
     async def _analyze_competitive_pricing(
-        self, city_id: Optional[int] = None
+        self, request: Request, city_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Analyze competitive pricing strategies and positioning."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:
                 # Analyze pricing patterns to infer competitive landscape
                 query = """
                 WITH pricing_analysis AS (
@@ -804,7 +809,7 @@ class CompetitiveIntelligenceService:
                         "strategic_actions": [
                             "Implement dynamic pricing capabilities",
                             "Develop category-specific pricing strategies",
-                            "Create value-added bundling options",
+                            "Value-added service bundling",
                             "Monitor competitive pricing intelligence",
                         ],
                         "timeline": "1-3 months",
@@ -892,6 +897,7 @@ class CompetitiveIntelligenceService:
 
     async def _store_competitive_analysis(
         self,
+        request: Request, # Add request
         city_id: Optional[int],
         competitors: List[CompetitorProfile],
         threats: List[MarketThreat],
@@ -900,7 +906,8 @@ class CompetitiveIntelligenceService:
     ) -> None:
         """Store competitive analysis results in database."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:
                 # Store main competitive intelligence record
                 await conn.execute(
                     """
@@ -959,7 +966,7 @@ class CompetitiveIntelligenceService:
             self.logger.error(f"Error storing competitive analysis: {e}")
 
     async def get_competitor_monitoring_dashboard(
-        self, city_id: Optional[int] = None
+        self, request: Request, city_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Get real-time competitor monitoring dashboard."""
         try:
@@ -1058,11 +1065,12 @@ class CompetitiveIntelligenceService:
             return {}
 
     async def get_market_share_analysis(
-        self, category_id: Optional[int] = None, city_id: Optional[int] = None
+        self, request: Request, category_id: Optional[int] = None, city_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Get detailed market share analysis for specific category or overall market."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:
                 # Analyze our market performance
                 query = """
                 WITH market_analysis AS (

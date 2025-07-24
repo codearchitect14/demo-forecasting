@@ -1151,6 +1151,11 @@
                 </div>
             </div>
             
+            <!-- Stopwatch Display -->
+            <div class="text-center mb-3" id="stopwatchDisplay" style="font-size: 1.2rem; font-weight: bold; color: #667eea; display: none;">
+                Processing time: <span id="elapsedTime">0.00</span> seconds
+            </div>
+
             <!-- Loading Spinner -->
             <div class="loading-spinner" id="loadingSpinner">
                 <div class="spinner-border text-primary" role="status">
@@ -1875,6 +1880,10 @@
             
             const forecastDays = parseInt(document.getElementById('forecastDays').value);
             
+            // Start stopwatch
+            const startTime = performance.now();
+            document.getElementById('stopwatchDisplay').style.display = 'none';
+
             // Show loading
             document.getElementById('loadingSpinner').style.display = 'block';
             document.getElementById('resultsContainer').style.display = 'none';
@@ -1901,6 +1910,12 @@
                 
                 const data = await response.json();
                 
+                // Stop stopwatch and display time
+                const endTime = performance.now();
+                const elapsedTime = ((endTime - startTime) / 1000).toFixed(2);
+                document.getElementById('elapsedTime').textContent = elapsedTime;
+                document.getElementById('stopwatchDisplay').style.display = 'block';
+
                 // Hide loading
                 document.getElementById('loadingSpinner').style.display = 'none';
                 document.getElementById('resultsContainer').style.display = 'block';
@@ -1914,6 +1929,7 @@
             } catch (error) {
                 console.error('Error generating forecast:', error);
                 document.getElementById('loadingSpinner').style.display = 'none';
+                document.getElementById('stopwatchDisplay').style.display = 'none'; // Hide on error
                 alert('Error generating forecast. Please try again.');
             }
         }
@@ -1926,6 +1942,10 @@
             
             const forecastDays = parseInt(document.getElementById('forecastDays').value);
             
+            // Start stopwatch
+            const startTime = performance.now();
+            document.getElementById('stopwatchDisplay').style.display = 'none';
+
             // Show loading
             document.getElementById('loadingSpinner').style.display = 'block';
             document.getElementById('resultsContainer').style.display = 'none';
@@ -1950,6 +1970,12 @@
                 
                 const data = await response.json();
                 
+                // Stop stopwatch and display time
+                const endTime = performance.now();
+                const elapsedTime = ((endTime - startTime) / 1000).toFixed(2);
+                document.getElementById('elapsedTime').textContent = elapsedTime;
+                document.getElementById('stopwatchDisplay').style.display = 'block';
+
                 // Hide loading
                 document.getElementById('loadingSpinner').style.display = 'none';
                 document.getElementById('resultsContainer').style.display = 'block';
@@ -1963,6 +1989,7 @@
             } catch (error) {
                 console.error('Error generating demand forecast:', error);
                 document.getElementById('loadingSpinner').style.display = 'none';
+                document.getElementById('stopwatchDisplay').style.display = 'none'; // Hide on error
                 alert('Error generating demand forecast. Please try again.');
             }
         }

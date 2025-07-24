@@ -10,10 +10,10 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 import json
-from database.connection import db_manager, cached
+from database.connection import cached
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 import logging
@@ -149,19 +149,20 @@ class DemandForecastResponse(BaseModel):
 
 @router.post("/demand-forecast")
 @cached(ttl=300) # Cache for 5 minutes
-async def demand_forecast(request: dict):
+async def demand_forecast(request_body: dict, request: Request):
     """
     Generate demand forecasts with inventory management insights
     """
     try:
-        if not db_manager.pool:
-            await db_manager.initialize()
-        async with db_manager.get_connection() as conn:
+        manager = request.app.state.db_manager
+        if not manager.pool:
+            raise RuntimeError("Database pool not initialized. Check startup events.")
+        async with manager.get_connection() as conn:
 
-            city_ids = request.get("city_ids", [])
-            store_ids = request.get("store_ids", [])
-            product_ids = request.get("product_ids", [])
-            forecast_days = request.get("forecast_days", 30)
+            city_ids = request_body.get("city_ids", [])
+            store_ids = request_body.get("store_ids", [])
+            product_ids = request_body.get("product_ids", [])
+            forecast_days = request_body.get("forecast_days", 30)
 
             # Get current inventory status
             inventory_status = await get_inventory_status(
@@ -1423,17 +1424,18 @@ def generate_inventory_recommendations(
 
 
 @router.post("/valid-products")
-async def get_valid_products(request: dict):
+async def get_valid_products(request_body: dict, request: Request):
     """
     Get products that have sales data for the selected cities and stores
     """
     try:
-        if not db_manager.pool:
-            await db_manager.initialize()
-        async with db_manager.get_connection() as conn:
+        manager = request.app.state.db_manager
+        if not manager.pool:
+            raise RuntimeError("Database pool not initialized. Check startup events.")
+        async with manager.get_connection() as conn:
 
-            city_ids = request.get("city_ids", [])
-            store_ids = request.get("store_ids", [])
+            city_ids = request_body.get("city_ids", [])
+            store_ids = request_body.get("store_ids", [])
 
             # Build query based on selections
             where_conditions = []
@@ -1559,44 +1561,45 @@ async def get_diverse_store_selection(
     "/multi-dimensional-forecast", response_model=MultiDimensionalForecastResponse
 )
 @cached(ttl=300) # Cache for 5 minutes
-async def multi_dimensional_forecast(request: MultiDimensionalForecastRequest):
+async def multi_dimensional_forecast(request_body: MultiDimensionalForecastRequest, request: Request):
     """
     Generate multi-dimensional forecasts with comparative analysis and insights
     """
     try:
-        if not db_manager.pool:
-            await db_manager.initialize()
-        async with db_manager.get_connection() as conn:
+        manager = request.app.state.db_manager
+        if not manager.pool:
+            raise RuntimeError("Database pool not initialized. Check startup events.")
+        async with manager.get_connection() as conn:
             # Get diverse store selection if needed
             diverse_store_ids = await get_diverse_store_selection(
-                conn, request.city_ids, request.store_ids
+                conn, request_body.city_ids, request_body.store_ids
             )
 
             # Get data for all combinations
             forecast_results = await generate_multi_dimensional_forecast(
                 conn,
-                request.city_ids,
+                request_body.city_ids,
                 diverse_store_ids,
-                request.product_ids,
-                request.forecast_days,
+                request_body.product_ids,
+                request_body.forecast_days,
             )
 
             # Generate insights
             insights = await generate_forecast_insights(
                 conn,
                 forecast_results,
-                request.city_ids,
-                request.store_ids,
-                request.product_ids,
+                request_body.city_ids,
+                request_body.store_ids,
+                request_body.product_ids,
             )
 
             # Generate comparative analysis
             comparative_analysis = await generate_comparative_analysis(
                 conn,
                 forecast_results,
-                request.city_ids,
-                request.store_ids,
-                request.product_ids,
+                request_body.city_ids,
+                request_body.store_ids,
+                request_body.product_ids,
             )
 
             # Generate summary
@@ -2430,14 +2433,15 @@ def generate_forecast_summary(
 
 
 @router.get("/weather-holiday-data")
-async def get_weather_holiday_data():
+async def get_weather_holiday_data(request: Request): # Accept Request object
     """
     Explore weather and holiday data patterns in the database
     """
     try:
-        if not db_manager.pool:
-            await db_manager.initialize()
-        async with db_manager.get_connection() as conn:
+        manager = request.app.state.db_manager # Access from app.state
+        if not manager.pool:
+            raise RuntimeError("Database pool not initialized. Check startup events.")
+        async with manager.get_connection() as conn:
 
             # Check weather data ranges
             weather_query = f"""
@@ -2604,27 +2608,25 @@ async def weather_api_status():
 
 @router.post("/weather-holiday-forecast")
 @cached(ttl=300) # Cache for 5 minutes
-async def weather_holiday_forecast(request: dict):
+async def weather_holiday_forecast(request_body: dict, request: Request):
     """
     Advanced weather and holiday-based forecasting with real-time recommendations
     """
     try:
-        if not db_manager.pool:
-            await db_manager.initialize()
-        async with db_manager.get_connection() as conn:
+        manager = request.app.state.db_manager
+        if not manager.pool:
+            raise RuntimeError("Database pool not initialized. Check startup events.")
+        async with manager.get_connection() as conn:
+            city_ids = request_body.get("city_ids", [])
+            store_ids = request_body.get("store_ids", [])
+            product_ids = request_body.get("product_ids", [])
+            discount_percentage = request_body.get("discount_percentage", 5)
+            promotion_duration = request_body.get("promotion_duration_days", 7)
 
-            city_ids = request.get("city_ids", [])
-            store_ids = request.get("store_ids", [])
-            product_ids = request.get("product_ids", [])
-            discount_percentage = request.get("discount_percentage", 0.0)
-            promotion_duration = request.get("promotion_duration_days", 7)
-
-            # Get current weather conditions for each city
             current_weather_recommendations = await generate_weather_recommendations(
                 conn, city_ids, store_ids, product_ids
             )
 
-            # Analyze promotional impact with weather and holiday factors
             promotional_analysis = await analyze_promotional_impact(
                 conn,
                 city_ids,
@@ -2634,22 +2636,18 @@ async def weather_holiday_forecast(request: dict):
                 promotion_duration,
             )
 
-            # Generate weather impact summary
             weather_impact_summary = await generate_weather_impact_summary(
                 conn, city_ids, store_ids, product_ids
             )
 
-            # Generate holiday impact summary
             holiday_impact_summary = await generate_holiday_impact_summary(
                 conn, city_ids, store_ids, product_ids
             )
 
-            # Generate bundle recommendations based on weather patterns
             bundle_recommendations = await generate_weather_bundle_recommendations(
                 conn, city_ids, store_ids, product_ids
             )
 
-            # Generate seasonal insights
             seasonal_insights = await generate_seasonal_insights(
                 conn, city_ids, store_ids, product_ids
             )

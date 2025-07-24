@@ -13,7 +13,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta, date
 from typing import Dict, List, Optional, Any, Tuple
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request # Import Request
 from pydantic import BaseModel
 import logging
 from sklearn.cluster import KMeans, DBSCAN
@@ -32,7 +32,7 @@ logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
 
 router = APIRouter()
-db_manager = DatabaseManager()
+# db_manager = DatabaseManager() # Remove module-level instantiation
 
 
 # Pydantic models
@@ -81,24 +81,25 @@ class ClusteringResponse(BaseModel):
 
 
 @router.post("/cluster-analysis")
-async def perform_clustering_analysis(request: ClusteringRequest):
+async def perform_clustering_analysis(request_body: ClusteringRequest, request: Request): # Add request: Request
     """
     Perform clustering analysis on products, stores, or cities
     """
     try:
-        await db_manager.initialize()
+        db_manager = request.app.state.db_manager # Get db_manager from app.state
+        # await db_manager.initialize() # Initialization handled by app.main.py
 
-        logger.info(f"Starting clustering analysis for {request.entity_type}")
+        logger.info(f"Starting clustering analysis for {request_body.entity_type}")
 
         # Get connection
         async with db_manager.get_connection() as conn:
             # Extract features for clustering
             features_df = await extract_clustering_features(
                 conn,
-                request.entity_type,
-                request.features,
-                request.analysis_period_days,
-                request.min_data_points,
+                request_body.entity_type,
+                request_body.features,
+                request_body.analysis_period_days,
+                request_body.min_data_points,
             )
 
             logger.info(
@@ -114,30 +115,30 @@ async def perform_clustering_analysis(request: ClusteringRequest):
 
             # Perform clustering
             clustering_result = await perform_clustering(
-                features_df, request.clustering_algorithm, request.n_clusters
+                features_df, request_body.clustering_algorithm, request_body.n_clusters
             )
 
             # Generate cluster profiles, entity assignments, and quality metrics
             cluster_profiles = await generate_cluster_profiles(
-                conn, clustering_result, request.entity_type, request.features
+                conn, clustering_result, request_body.entity_type, request_body.features
             )
             entity_assignments = await generate_entity_assignments(
-                conn, clustering_result, request.entity_type
+                conn, clustering_result, request_body.entity_type
             )
             cluster_quality_metrics = calculate_cluster_quality_metrics(
                 clustering_result
             )
             insights = generate_clustering_insights(
-                cluster_profiles, request.entity_type
+                cluster_profiles, request_body.entity_type
             )
             recommendations = generate_clustering_recommendations(
-                cluster_profiles, request.entity_type
+                cluster_profiles, request_body.entity_type
             )
 
             return ClusteringResponse(
                 success=True,
-                entity_type=request.entity_type,
-                algorithm_used=request.clustering_algorithm,
+                entity_type=request_body.entity_type,
+                algorithm_used=request_body.clustering_algorithm,
                 n_clusters=clustering_result["n_clusters"],
                 cluster_profiles=cluster_profiles,
                 entity_assignments=entity_assignments,
@@ -603,7 +604,7 @@ async def extract_city_features(
                     sh.city_id,
                     s.dt,
                     SUM(CAST(s.sale_amount AS FLOAT)) as daily_revenue
-                FROM sales_data s
+                FROM sales_data
                 JOIN store_hierarchy sh ON s.store_id = sh.store_id
                 WHERE s.dt BETWEEN $1 AND $2
                 GROUP BY sh.city_id, s.dt
@@ -644,7 +645,7 @@ async def extract_city_features(
                     sh.city_id,
                     s.dt,
                     SUM(CAST(s.sale_amount AS FLOAT)) as daily_revenue
-                FROM sales_data s
+                FROM sales_data
                 JOIN store_hierarchy sh ON s.store_id = sh.store_id
                 WHERE s.dt BETWEEN $1 AND $2
                 GROUP BY sh.city_id, s.dt
@@ -1091,7 +1092,9 @@ def get_representative_entities(
                     }
                 )
 
-        return representatives
+            entity_assignments.append(entity_info)
+
+        return entity_assignments
 
     except Exception as e:
         logger.error(f"Error getting representative entities: {e}")
@@ -1522,17 +1525,18 @@ async def get_available_clustering_features():
 
 
 @router.post("/cluster-comparison")
-async def compare_clusters(request: dict):
+async def compare_clusters(request_body: dict, request: Request): # Add request: Request
     """
     Compare different clustering approaches
     """
     try:
-        await db_manager.initialize()
+        db_manager = request.app.state.db_manager # Get db_manager from app.state
+        # await db_manager.initialize() # Initialization handled by app.main.py
 
-        entity_type = request.get("entity_type", "products")
-        features = request.get("features", ["demand_profile", "stockout_rate"])
-        analysis_period_days = request.get("analysis_period_days", 365)
-        min_data_points = request.get("min_data_points", 30)
+        entity_type = request_body.get("entity_type", "products")
+        features = request_body.get("features", ["demand_profile", "stockout_rate"])
+        analysis_period_days = request_body.get("analysis_period_days", 365)
+        min_data_points = request_body.get("min_data_points", 30)
 
         logger.info(f"Comparing clustering approaches for {entity_type}")
 

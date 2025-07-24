@@ -9,7 +9,8 @@ from typing import Dict, Any, Optional, List, Tuple
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from database.connection import get_pool
+from fastapi import Request
+# from database.connection import get_pool # Removed
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +23,11 @@ class DynamicPromotionService:
         self.promotion_patterns = {}
 
     async def get_promotion_data(
-        self, store_id: int, product_id: int, limit: int = 1000
+        self, request: Request, store_id: int, product_id: int, limit: int = 1000
     ) -> pd.DataFrame:
         """Fetch actual promotion and sales data from database."""
 
-        pool = await get_pool()
+        manager = request.app.state.db_manager # Access db_manager
 
         query = """
         SELECT 
@@ -48,7 +49,7 @@ class DynamicPromotionService:
         LIMIT $3
         """
 
-        async with pool.acquire() as connection:
+        async with manager.get_connection() as connection: # Use manager's connection
             rows = await connection.fetch(query, store_id, product_id, limit)
 
         if not rows:
@@ -59,13 +60,13 @@ class DynamicPromotionService:
         return df
 
     async def analyze_promotion_impact(
-        self, store_id: int, product_id: int
+        self, request: Request, store_id: int, product_id: int
     ) -> Dict[str, Any]:
         """Analyze promotion impact for a specific store and product."""
 
         try:
             # Get historical promotion data
-            promotion_data = await self.get_promotion_data(store_id, product_id)
+            promotion_data = await self.get_promotion_data(request, store_id, product_id)
 
             if promotion_data.empty:
                 return {
@@ -119,11 +120,11 @@ class DynamicPromotionService:
             return {"error": f"Analysis failed: {str(e)}"}
 
     async def analyze_cross_product_effects(
-        self, store_id: int, product_id: int, city_id: int = 0
+        self, request: Request, store_id: int, product_id: int, city_id: int = 0
     ) -> Dict[str, Any]:
         """Analyze cross-product effects of promotions."""
         try:
-            df = await self.get_promotion_data(store_id, product_id)
+            df = await self.get_promotion_data(request, store_id, product_id)
             if df.empty:
                 return self._generate_simulated_cross_product_effects()
 
@@ -140,11 +141,11 @@ class DynamicPromotionService:
             return self._generate_simulated_cross_product_effects()
 
     async def analyze_optimal_pricing(
-        self, store_id: int, product_id: int, city_id: int = 0
+        self, request: Request, store_id: int, product_id: int, city_id: int = 0
     ) -> Dict[str, Any]:
         """Analyze optimal pricing strategies."""
         try:
-            df = await self.get_promotion_data(store_id, product_id)
+            df = await self.get_promotion_data(request, store_id, product_id)
             if df.empty:
                 return self._generate_simulated_optimal_pricing()
 
@@ -161,11 +162,11 @@ class DynamicPromotionService:
             return self._generate_simulated_optimal_pricing()
 
     async def optimize_promotion_roi(
-        self, store_id: int, product_id: int, city_id: int = 0
+        self, request: Request, store_id: int, product_id: int, city_id: int = 0
     ) -> Dict[str, Any]:
         """Optimize promotion ROI."""
         try:
-            df = await self.get_promotion_data(store_id, product_id)
+            df = await self.get_promotion_data(request, store_id, product_id)
             if df.empty:
                 return self._generate_simulated_roi_optimization()
 
