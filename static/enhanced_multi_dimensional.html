@@ -301,7 +301,6 @@
         }
         
         .promotional-analysis-card {
-            background: white;
             border-radius: 10px;
             padding: 1rem;
             margin-bottom: 1rem;
@@ -310,18 +309,22 @@
         
         .promotional-analysis-card.highly-recommended {
             border-left: 4px solid #28a745;
+            background: linear-gradient(90deg, #e6f9ed 0%, #fff 100%);
         }
         
         .promotional-analysis-card.recommended {
             border-left: 4px solid #17a2b8;
+            background: linear-gradient(90deg, #e0faff 0%, #fff 100%);
         }
         
         .promotional-analysis-card.moderate {
             border-left: 4px solid #ffc107;
+            background: linear-gradient(90deg, #fffbe6 0%, #fff 100%);
         }
         
         .promotional-analysis-card.not-recommended {
             border-left: 4px solid #dc3545;
+            background: linear-gradient(90deg, #ffeaea 0%, #fff 100%);
         }
         
         .bundle-recommendation-card {
@@ -761,8 +764,8 @@
             box-shadow: 0 4px 18px rgba(0,0,0,0.10);
             margin-bottom: 1.2rem;
             padding: 1.3rem 1.5rem 1.1rem 1.5rem;
-            background: #fff;
-            border-left: 7px solid #667eea;
+            background: #f8fafc; /* Softer base background */
+            border-left: 7px solid #e0e7ef; /* Softer default border */
             position: relative;
             opacity: 0;
             transform: translateY(30px) scale(0.98);
@@ -3074,15 +3077,36 @@
             }
 
             let htmlContent = '';
-            promotionalAnalysisData.forEach(promo => {
+            promotionalAnalysisData.forEach((promo, idx) => {
                 const recommendationLevel = promo.recommendation.toLowerCase().includes('highly') ? 'highly-recommended' :
                                           promo.recommendation.toLowerCase().includes('recommended') ? 'recommended' :
                                           promo.recommendation.toLowerCase().includes('moderate') ? 'moderate' : 'not-recommended';
                 const alertClass = getRecommendationAlertClass(recommendationLevel);
                 const recommendationIcon = getRecommendationIcon(recommendationLevel);
 
-                htmlContent += `
-                    <div class="promotional-analysis-card ${recommendationLevel} mb-3">
+                let cardBackgroundColor = '';
+                let cardBorderLeftColor = '';
+
+                if (recommendationLevel === 'highly-recommended') {
+                    cardBackgroundColor = 'linear-gradient(90deg, #e6f9ed 0%, #fff 100%)';
+                    cardBorderLeftColor = '#28a745';
+                } else if (recommendationLevel === 'recommended') {
+                    cardBackgroundColor = 'linear-gradient(90deg, #e0faff 0%, #fff 100%)';
+                    cardBorderLeftColor = '#17a2b8';
+                } else if (recommendationLevel === 'moderate') {
+                    cardBackgroundColor = 'linear-gradient(90deg, #fffbe6 0%, #fff 100%)';
+                    cardBorderLeftColor = '#ffc107';
+                } else if (recommendationLevel === 'not-recommended') {
+                    cardBackgroundColor = 'linear-gradient(90deg, #ffeaea 0%, #fff 100%)';
+                    cardBorderLeftColor = '#dc3545';
+                }
+
+                const card = document.createElement('div');
+                card.className = `promotional-analysis-card ${recommendationLevel} mb-3`;
+                card.style.setProperty('background', cardBackgroundColor, 'important');
+                card.style.setProperty('border-left', `4px solid ${cardBorderLeftColor}`, 'important');
+
+                card.innerHTML = `
                         <div class="row">
                             <div class="col-md-9">
                                 <h6>${promo.product_name} - ${promo.city_name} ${promo.store_name}</h6>
@@ -3107,6 +3131,12 @@
                                 <div class="h3 mb-2">${recommendationIcon}</div>
                                 <div class="fw-bold">${promo.recommendation}</div>
                                 <div class="small text-muted">${promo.optimal_timing || 'Any time'}</div>
+                                <div style="font-size: 0.7em; color: #888;">
+                                    Debug: Lvl: ${recommendationLevel}<br>
+                                    Bg: ${cardBackgroundColor.substring(0, 20)}...<br>
+                                    Border: ${cardBorderLeftColor}<br>
+                                    Raw Rec: ${promo.recommendation}
+                                </div>
                             </div>
                         </div>
                         <div class="mt-2">
@@ -3114,8 +3144,21 @@
                                 ${promo.reasoning || 'No specific reasoning provided.'}
                             </div>
                         </div>
-                    </div>
                 `;
+                // Animate in
+                setTimeout(() => card.classList.add('show'), 100 + idx * 80);
+                // Auto-dismiss after 1 min unless hovered
+                let autoDismissTimeout;
+                function setAutoDismiss() {
+                    autoDismissTimeout = setTimeout(() => {
+                        dismissPromoAlert(card);
+                    }, 60000);
+                }
+                card.addEventListener('mouseenter', () => clearTimeout(autoDismissTimeout));
+                card.addEventListener('mouseleave', setAutoDismiss);
+                setAutoDismiss();
+                // Stack at top
+                content.prepend(card); // Prepend to add to top
             });
             
             content.innerHTML = htmlContent;
@@ -3602,12 +3645,12 @@
         
         function getRecommendationIcon(level) {
             const icons = {
-                'highly-recommended': '<i class="fas fa-star text-success"></i>',
-                'recommended': '<i class="fas fa-thumbs-up text-info"></i>',
-                'moderate': '<i class="fas fa-meh text-warning"></i>',
-                'not-recommended': '<i class="fas fa-thumbs-down text-danger"></i>'
+                'highly-recommended': '<i class="fas fa-arrow-alt-circle-up text-success !important"></i>',
+                'recommended': '<i class="fas fa-check-circle text-info !important"></i>',
+                'moderate': '<i class="fas fa-exclamation-circle text-warning !important"></i>',
+                'not-recommended': '<i class="fas fa-times-circle text-danger !important"></i>'
             };
-            return icons[level] || '<i class="fas fa-minus text-secondary"></i>';
+            return icons[level] || '<i class="fas fa-question-circle text-secondary !important"></i>';
         }
         
         function getRecommendationAlertClass(level) {
@@ -3804,10 +3847,14 @@
             items.forEach((item, index) => {
                 const span = document.createElement('span');
                 span.className = 'selected-item';
-                span.innerHTML = `
-                    ${item.name}
-                    <button class="remove-btn" onclick="${removeFunction.name}(${index})">×</button>
-                `;
+                span.textContent = item.name;
+
+                const removeBtn = document.createElement('button');
+                removeBtn.className = 'remove-btn';
+                removeBtn.textContent = '×';
+                removeBtn.addEventListener('click', () => removeFunction(index));
+
+                span.appendChild(removeBtn);
                 container.appendChild(span);
             });
         }
