@@ -12,7 +12,7 @@ from decimal import Decimal
 import asyncio
 from dataclasses import dataclass
 import json
-from fastapi import Request # Import Request
+from fastapi import Request  # Import Request
 
 # from database.connection import get_db_connection # Removed
 from utils.logger import get_logger
@@ -81,7 +81,10 @@ class BusinessInsightsService:
         }
 
     async def generate_comprehensive_business_insights(
-        self, request: Request, city_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        city_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Generate comprehensive business insights from all analytical dimensions."""
         try:
@@ -90,9 +93,15 @@ class BusinessInsightsService:
             )
 
             # Collect data from all analytical services in parallel
-            operational_task = self._analyze_operational_insights(request, city_id, store_id)
-            strategic_task = self._analyze_strategic_insights(request, city_id, store_id)
-            financial_task = self._analyze_financial_insights(request, city_id, store_id)
+            operational_task = self._analyze_operational_insights(
+                request, city_id, store_id
+            )
+            strategic_task = self._analyze_strategic_insights(
+                request, city_id, store_id
+            )
+            financial_task = self._analyze_financial_insights(
+                request, city_id, store_id
+            )
             competitive_task = self._analyze_competitive_insights(request, city_id)
             customer_task = self._analyze_customer_insights(request, city_id, store_id)
 
@@ -130,7 +139,9 @@ class BusinessInsightsService:
             health_metrics = self._calculate_business_health_metrics(all_insights)
 
             # Store insights in database
-            await self._store_business_insights(all_insights, executive_summary, request)
+            await self._store_business_insights(
+                all_insights, executive_summary, request
+            )
 
             return {
                 "generation_timestamp": datetime.now().isoformat(),
@@ -209,7 +220,10 @@ class BusinessInsightsService:
             raise
 
     async def _analyze_operational_insights(
-        self, request: Request, city_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        city_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> List[BusinessInsight]:
         """Analyze operational performance and generate insights."""
         insights = []
@@ -278,12 +292,26 @@ class BusinessInsightsService:
                 )
 
             # Inventory Optimization Insight
-            inventory_service = InventoryOptimizationService() # Instantiate service here
-            inventory_opportunities = await inventory_service.analyze_cross_store_opportunities(request, city_id, store_id)
+            inventory_service = (
+                InventoryOptimizationService()
+            )  # Instantiate service here
+            inventory_opportunities = (
+                await inventory_service.analyze_cross_store_opportunities(
+                    request, city_id, store_id
+                )
+            )
 
             total_opportunities = len(inventory_opportunities)
-            revenue_potential_sum = sum(opp.revenue_potential for opp in inventory_opportunities)
-            immediate_priority_count = len([opp for opp in inventory_opportunities if opp.priority_level == "immediate"])
+            revenue_potential_sum = sum(
+                opp.revenue_potential for opp in inventory_opportunities
+            )
+            immediate_priority_count = len(
+                [
+                    opp
+                    for opp in inventory_opportunities
+                    if opp.priority_level == "immediate"
+                ]
+            )
 
             if total_opportunities > 0:
                 insights.append(
@@ -304,7 +332,7 @@ class BusinessInsightsService:
                             "optimization_opportunities": total_opportunities,
                             "immediate_priority": immediate_priority_count,
                             "revenue_potential": revenue_potential_sum,
-                            "roi_estimate": 3.2, # Placeholder, actual ROI would require more complex calculation
+                            "roi_estimate": 3.2,  # Placeholder, actual ROI would require more complex calculation
                         },
                         recommendations=[
                             "Execute immediate-priority transfers within 48 hours",
@@ -334,23 +362,40 @@ class BusinessInsightsService:
             return []
 
     async def _analyze_strategic_insights(
-        self, request: Request, city_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        city_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> List[BusinessInsight]:
         """Analyze strategic opportunities and generate insights."""
         insights = []
 
         try:
             # Portfolio Strategy Insight
-            portfolio_service = PortfolioAnalysisService() # Instantiate service here
-            portfolio_analysis = await portfolio_service.analyze_product_portfolio(request, store_id, city_id)
+            portfolio_service = PortfolioAnalysisService()  # Instantiate service here
+            portfolio_analysis = await portfolio_service.analyze_product_portfolio(
+                request, store_id, city_id
+            )
 
             # Extract relevant data from portfolio_analysis for insights
-            bundle_opportunities_count = portfolio_analysis.get("bundle_opportunities", {}).get("total_bundles", 0)
-            high_confidence_bundles = portfolio_analysis.get("bundle_opportunities", {}).get("high_confidence_bundles", 0)
-            quarterly_revenue_potential = portfolio_analysis.get("bundle_opportunities", {}).get("quarterly_revenue_potential", 0)
-            average_success_rate = portfolio_analysis.get("bundle_opportunities", {}).get("average_success_rate", 0)
-            portfolio_diversification_score = portfolio_analysis.get("category_analysis", {}).get("diversification_score", 0)
-            correlations_summary = portfolio_analysis.get("product_correlations", {}).get("summary", "No significant correlations.")
+            bundle_opportunities_count = portfolio_analysis.get(
+                "bundle_opportunities", {}
+            ).get("total_bundles", 0)
+            high_confidence_bundles = portfolio_analysis.get(
+                "bundle_opportunities", {}
+            ).get("high_confidence_bundles", 0)
+            quarterly_revenue_potential = portfolio_analysis.get(
+                "bundle_opportunities", {}
+            ).get("quarterly_revenue_potential", 0)
+            average_success_rate = portfolio_analysis.get(
+                "bundle_opportunities", {}
+            ).get("average_success_rate", 0)
+            portfolio_diversification_score = portfolio_analysis.get(
+                "category_analysis", {}
+            ).get("diversification_score", 0)
+            correlations_summary = portfolio_analysis.get(
+                "product_correlations", {}
+            ).get("summary", "No significant correlations.")
 
             insights.append(
                 BusinessInsight(
@@ -443,32 +488,45 @@ class BusinessInsightsService:
             return []
 
     async def _analyze_financial_insights(
-        self, request: Request, city_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        city_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> List[BusinessInsight]:
         """Analyze financial performance and generate insights."""
         insights = []
 
         try:
             # Fetch operational insights to get inventory optimization revenue potential
-            operational_insights = await self._analyze_operational_insights(request, city_id, store_id)
+            operational_insights = await self._analyze_operational_insights(
+                request, city_id, store_id
+            )
             inventory_revenue_contribution = sum(
-                insight.key_metrics.get("revenue_potential", 0) for insight in operational_insights
+                insight.key_metrics.get("revenue_potential", 0)
+                for insight in operational_insights
                 if insight.category == "inventory_optimization"
             )
 
             # Fetch strategic insights to get bundle revenue potential
-            strategic_insights = await self._analyze_strategic_insights(request, city_id, store_id)
+            strategic_insights = await self._analyze_strategic_insights(
+                request, city_id, store_id
+            )
             bundle_revenue_contribution = sum(
-                insight.key_metrics.get("quarterly_revenue_potential", 0) for insight in strategic_insights
+                insight.key_metrics.get("quarterly_revenue_potential", 0)
+                for insight in strategic_insights
                 if insight.category == "portfolio_strategy"
             )
 
             # Placeholder for promotion contribution, assuming it would come from an EnhancedPromotionService call
             # For now, we'll use a placeholder or derive from existing data if possible.
             # If there's an api/promotions.py or services/enhanced_promotion_service.py that provides this, integrate it here.
-            promotion_contribution = 12000 # Placeholder for now, to be integrated later if service available
+            promotion_contribution = 12000  # Placeholder for now, to be integrated later if service available
 
-            total_revenue_opportunity = inventory_revenue_contribution + bundle_revenue_contribution + promotion_contribution
+            total_revenue_opportunity = (
+                inventory_revenue_contribution
+                + bundle_revenue_contribution
+                + promotion_contribution
+            )
 
             # Revenue Optimization Insight
             if total_revenue_opportunity > 0:
@@ -503,7 +561,8 @@ class BusinessInsightsService:
                         ],
                         potential_impact={
                             "quarterly_revenue_increase": total_revenue_opportunity,
-                            "annual_projection": total_revenue_opportunity * 4, # Simple annual projection
+                            "annual_projection": total_revenue_opportunity
+                            * 4,  # Simple annual projection
                             "margin_improvement": "8-12%",
                             "payback_period": "2.5 months",
                         },
@@ -575,15 +634,29 @@ class BusinessInsightsService:
 
         try:
             # Competitive Position Insight
-            competitive_service = CompetitiveIntelligenceService() # Instantiate service here
-            market_intelligence = await competitive_service.get_market_intelligence(request, city_id)
-            competitive_threats = await competitive_service.assess_competitive_threats(request, city_id)
+            competitive_service = (
+                CompetitiveIntelligenceService()
+            )  # Instantiate service here
+            market_intelligence = await competitive_service.get_market_intelligence(
+                request, city_id
+            )
+            competitive_threats = await competitive_service.assess_competitive_threats(
+                request, city_id
+            )
 
-            competitive_strength_score = market_intelligence.get("market_position", {}).get("competitive_strength_score", 75.0)
-            market_share_estimate = market_intelligence.get("market_position", {}).get("market_share_estimate", 0.0)
+            competitive_strength_score = market_intelligence.get(
+                "market_position", {}
+            ).get("competitive_strength_score", 75.0)
+            market_share_estimate = market_intelligence.get("market_position", {}).get(
+                "market_share_estimate", 0.0
+            )
             threat_level = competitive_threats.get("overall_threat_level", "medium")
-            opportunity_count = market_intelligence.get("opportunities", {}).get("total_opportunities", 0)
-            strategic_advantage_areas = len(market_intelligence.get("strategic_advantages", []))
+            opportunity_count = market_intelligence.get("opportunities", {}).get(
+                "total_opportunities", 0
+            )
+            strategic_advantage_areas = len(
+                market_intelligence.get("strategic_advantages", [])
+            )
             revenue_defense = competitive_threats.get("potential_revenue_at_risk", 0)
             growth_opportunity = market_intelligence.get("revenue_growth_potential", 0)
 
@@ -637,22 +710,41 @@ class BusinessInsightsService:
             return []
 
     async def _analyze_customer_insights(
-        self, request: Request, city_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        city_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> List[BusinessInsight]:
         """Analyze customer behavior and generate insights."""
         insights = []
 
         try:
             # Customer Retention Insight
-            customer_service = CustomerBehaviorService() # Instantiate service here
-            customer_behavior_analysis = await customer_service.analyze_customer_behavior(request, store_id, city_id)
+            customer_service = CustomerBehaviorService()  # Instantiate service here
+            customer_behavior_analysis = (
+                await customer_service.analyze_customer_behavior(
+                    request, store_id, city_id
+                )
+            )
 
-            churn_risk_percentage = customer_behavior_analysis.get("retention_analysis", {}).get("churn_risk_percentage", 0.0)
-            revenue_at_risk = customer_behavior_analysis.get("retention_analysis", {}).get("revenue_at_risk", 0)
-            high_value_customer_count = customer_behavior_analysis.get("segmentation_summary", {}).get("high_value_customers", 0)
-            retention_opportunity = customer_behavior_analysis.get("retention_analysis", {}).get("retention_opportunity_score", 0.0)
-            customer_lifetime_value = customer_behavior_analysis.get("customer_lifecycle", {}).get("average_clv", 0)
-            segmentation_summary = customer_behavior_analysis.get("segmentation_summary", {}).get("summary", "No segmentation data.")
+            churn_risk_percentage = customer_behavior_analysis.get(
+                "retention_analysis", {}
+            ).get("churn_risk_percentage", 0.0)
+            revenue_at_risk = customer_behavior_analysis.get(
+                "retention_analysis", {}
+            ).get("revenue_at_risk", 0)
+            high_value_customer_count = customer_behavior_analysis.get(
+                "segmentation_summary", {}
+            ).get("high_value_customers", 0)
+            retention_opportunity = customer_behavior_analysis.get(
+                "retention_analysis", {}
+            ).get("retention_opportunity_score", 0.0)
+            customer_lifetime_value = customer_behavior_analysis.get(
+                "customer_lifecycle", {}
+            ).get("average_clv", 0)
+            segmentation_summary = customer_behavior_analysis.get(
+                "segmentation_summary", {}
+            ).get("summary", "No segmentation data.")
 
             insights.append(
                 BusinessInsight(
@@ -775,15 +867,37 @@ class BusinessInsightsService:
                 "Comprehensive analytics platform successfully deployed",
                 "Real-time monitoring system operational with improved alert accuracy",
             ]
-            if any(i.category == "inventory_optimization" and i.potential_impact.get("revenue_generation", 0) > 0 for i in insights):
-                key_achievements.append("Inventory optimization identified significant revenue opportunities")
-            if any(i.category == "portfolio_strategy" and i.key_metrics.get("quarterly_revenue_potential", 0) > 0 for i in insights):
-                key_achievements.append("Product bundling strategy identified new revenue streams")
-            if any(i.category == "retention_optimization" and i.key_metrics.get("revenue_at_risk", 0) > 0 for i in insights):
-                key_achievements.append("Customer retention analysis provided actionable insights")
+            if any(
+                i.category == "inventory_optimization"
+                and i.potential_impact.get("revenue_generation", 0) > 0
+                for i in insights
+            ):
+                key_achievements.append(
+                    "Inventory optimization identified significant revenue opportunities"
+                )
+            if any(
+                i.category == "portfolio_strategy"
+                and i.key_metrics.get("quarterly_revenue_potential", 0) > 0
+                for i in insights
+            ):
+                key_achievements.append(
+                    "Product bundling strategy identified new revenue streams"
+                )
+            if any(
+                i.category == "retention_optimization"
+                and i.key_metrics.get("revenue_at_risk", 0) > 0
+                for i in insights
+            ):
+                key_achievements.append(
+                    "Customer retention analysis provided actionable insights"
+                )
 
             # Identify critical issues
-            critical_insights = sorted([i for i in insights if i.priority_level == "critical"], key=lambda x: x.confidence_score, reverse=True)
+            critical_insights = sorted(
+                [i for i in insights if i.priority_level == "critical"],
+                key=lambda x: x.confidence_score,
+                reverse=True,
+            )
             critical_issues = []
             for insight in critical_insights:
                 critical_issues.append(f"{insight.category}: {insight.summary}")
@@ -795,53 +909,110 @@ class BusinessInsightsService:
 
             # Identify growth opportunities
             growth_opportunities_list = []
-            revenue_opportunities_sum = sum(float(i.potential_impact.get("revenue_generation", 0) or
-                                                i.potential_impact.get("quarterly_revenue_increase", 0) or
-                                                i.potential_impact.get("cross_sell_revenue", 0) or
-                                                i.potential_impact.get("growth_opportunity", 0) or
-                                                i.potential_impact.get("revenue_protection", 0)) # Sum various revenue impacts
-                                        for i in insights
-                                        if "revenue" in str(i.potential_impact).lower() or "growth" in str(i.potential_impact).lower())
+            revenue_opportunities_sum = sum(
+                float(
+                    i.potential_impact.get("revenue_generation", 0)
+                    or i.potential_impact.get("quarterly_revenue_increase", 0)
+                    or i.potential_impact.get("cross_sell_revenue", 0)
+                    or i.potential_impact.get("growth_opportunity", 0)
+                    or i.potential_impact.get("revenue_protection", 0)
+                )  # Sum various revenue impacts
+                for i in insights
+                if "revenue" in str(i.potential_impact).lower()
+                or "growth" in str(i.potential_impact).lower()
+            )
 
             if revenue_opportunities_sum > 0:
-                growth_opportunities_list.append(f"${revenue_opportunities_sum:,.0f} total revenue opportunity identified")
+                growth_opportunities_list.append(
+                    f"${revenue_opportunities_sum:,.0f} total revenue opportunity identified"
+                )
 
             # Add other growth opportunities dynamically
             for insight in insights:
-                if "efficiency" in str(insight.potential_impact).lower() and "improvement" in str(insight.potential_impact).lower():
-                    growth_opportunities_list.append(f"{insight.title} with {insight.potential_impact.get("operational_efficiency", "significant")} efficiency potential")
+                if (
+                    "efficiency" in str(insight.potential_impact).lower()
+                    and "improvement" in str(insight.potential_impact).lower()
+                ):
+                    growth_opportunities_list.append(
+                        f"{insight.title} with {insight.potential_impact.get('operational_efficiency', 'significant')} efficiency potential"
+                    )
                 if "customer_lifetime_value_increase" in insight.potential_impact:
-                    growth_opportunities_list.append(f"{insight.title} leading to {insight.potential_impact.get("customer_lifetime_value_increase")} in CLV")
+                    growth_opportunities_list.append(
+                        f"{insight.title} leading to {insight.potential_impact.get('customer_lifetime_value_increase')} in CLV"
+                    )
                 if "competitive_advantage" in insight.potential_impact:
-                    growth_opportunities_list.append(f"{insight.title} for sustainable competitive advantage")
+                    growth_opportunities_list.append(
+                        f"{insight.title} for sustainable competitive advantage"
+                    )
 
             if not growth_opportunities_list:
-                growth_opportunities_list = ["No specific growth opportunities identified, continue monitoring."]
-
+                growth_opportunities_list = [
+                    "No specific growth opportunities identified, continue monitoring."
+                ]
 
             # Financial outlook
-            total_revenue_opportunity = sum(float(i.potential_impact.get("revenue_generation", 0) or
-                                                i.potential_impact.get("quarterly_revenue_increase", 0) or
-                                                i.potential_impact.get("cross_sell_revenue", 0) or
-                                                i.potential_impact.get("growth_opportunity", 0) or
-                                                i.potential_impact.get("revenue_protection", 0)) # Sum various revenue impacts
-                                        for i in insights
-                                        if "revenue" in str(i.potential_impact).lower() or "growth" in str(i.potential_impact).lower())
+            total_revenue_opportunity = sum(
+                float(
+                    i.potential_impact.get("revenue_generation", 0)
+                    or i.potential_impact.get("quarterly_revenue_increase", 0)
+                    or i.potential_impact.get("cross_sell_revenue", 0)
+                    or i.potential_impact.get("growth_opportunity", 0)
+                    or i.potential_impact.get("revenue_protection", 0)
+                )  # Sum various revenue impacts
+                for i in insights
+                if "revenue" in str(i.potential_impact).lower()
+                or "growth" in str(i.potential_impact).lower()
+            )
 
-            total_cost_savings_potential = sum(float(i.key_metrics.get("annual_savings_estimate", 0)) for i in insights if i.insight_type == "financial" and i.category == "cost_optimization")
+            total_cost_savings_potential = sum(
+                float(i.key_metrics.get("annual_savings_estimate", 0))
+                for i in insights
+                if i.insight_type == "financial" and i.category == "cost_optimization"
+            )
 
             financial_outlook = {
                 "revenue_opportunity": total_revenue_opportunity,
                 "cost_optimization_potential": total_cost_savings_potential,
-                "roi_estimate": np.mean([i.key_metrics.get("roi_estimate", 0) for i in insights if "roi_estimate" in i.key_metrics]) if insights else 0,
-                "payback_period_months": np.mean([float(i.implementation_timeline.split('-')[0]) for i in insights if "month" in i.implementation_timeline]) if insights else None,
-                "confidence_level": "high" if np.mean([i.confidence_score for i in insights]) > 0.75 else "medium",
+                "roi_estimate": (
+                    np.mean(
+                        [
+                            i.key_metrics.get("roi_estimate", 0)
+                            for i in insights
+                            if "roi_estimate" in i.key_metrics
+                        ]
+                    )
+                    if insights
+                    else 0
+                ),
+                "payback_period_months": (
+                    np.mean(
+                        [
+                            float(i.implementation_timeline.split("-")[0])
+                            for i in insights
+                            if "month" in i.implementation_timeline
+                        ]
+                    )
+                    if insights
+                    else None
+                ),
+                "confidence_level": (
+                    "high"
+                    if np.mean([i.confidence_score for i in insights]) > 0.75
+                    else "medium"
+                ),
             }
 
             # Determine competitive position
-            competitive_insights = [i for i in insights if i.insight_type == "competitive"]
+            competitive_insights = [
+                i for i in insights if i.insight_type == "competitive"
+            ]
             if competitive_insights:
-                comp_score = np.mean([i.key_metrics.get("competitive_strength_score", 75) for i in competitive_insights])
+                comp_score = np.mean(
+                    [
+                        i.key_metrics.get("competitive_strength_score", 75)
+                        for i in competitive_insights
+                    ]
+                )
                 if comp_score >= 80:
                     competitive_position = "market_leader"
                 elif comp_score >= 70:
@@ -854,11 +1025,16 @@ class BusinessInsightsService:
                 competitive_position = "competitive"
 
             # Strategic priorities
-            strategic_priorities = sorted(list(set([rec for i in insights for rec in i.recommendations])), reverse=True)
+            strategic_priorities = sorted(
+                list(set([rec for i in insights for rec in i.recommendations])),
+                reverse=True,
+            )
             # Take top 5 unique recommendations as strategic priorities
             strategic_priorities = strategic_priorities[:5]
             if not strategic_priorities:
-                strategic_priorities = ["Continue to monitor and analyze business performance."]
+                strategic_priorities = [
+                    "Continue to monitor and analyze business performance."
+                ]
 
             return ExecutiveSummary(
                 summary_date=datetime.now(),
@@ -1115,7 +1291,10 @@ class BusinessInsightsService:
         return categorization
 
     async def _store_business_insights(
-        self, insights: List[BusinessInsight], executive_summary: ExecutiveSummary, request: Request
+        self,
+        insights: List[BusinessInsight],
+        executive_summary: ExecutiveSummary,
+        request: Request,
     ) -> None:
         """Store business insights in database."""
         try:

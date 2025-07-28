@@ -2,7 +2,7 @@
 FreshRetail Forecasting API initialization.
 """
 
-from fastapi import APIRouter # Change from FastAPI to APIRouter
+from fastapi import APIRouter  # Change from FastAPI to APIRouter
 from fastapi.middleware.cors import CORSMiddleware
 import logging
 import os
@@ -23,7 +23,7 @@ logger = logging.getLogger(__name__)
 
 # Create main API router
 router = APIRouter(
-    prefix="", # Adjusted prefix as this will be included under /api in main.py
+    prefix="",  # Adjusted prefix as this will be included under /api in main.py
     tags=["Core API"],
 )
 
@@ -46,14 +46,14 @@ router.include_router(clustering_router, prefix="/clustering")
 
 
 # Root endpoint
-@router.get("/") # Changed from @app.get
+@router.get("/")  # Changed from @app.get
 async def root():
     """Root endpoint."""
     return {
         "message": "Welcome to the FreshRetail Forecasting API",
         "version": "1.0.0",
         "endpoints": {
-            "forecast": "/api/forecast/", 
+            "forecast": "/api/forecast/",
             "promotions": "/api/promotions/",
             "analytics": "/api/analytics/",
             "enhanced": "/api/enhanced/",
@@ -64,7 +64,7 @@ async def root():
 
 
 # Health check endpoint
-@router.get("/health") # Changed from @app.get
+@router.get("/health")  # Changed from @app.get
 async def health():
     """Health check endpoint."""
     return {"status": "healthy"}

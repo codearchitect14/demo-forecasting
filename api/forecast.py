@@ -6,7 +6,14 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union, Any
 import pandas as pd  # type: ignore
 import numpy as np  # type: ignore
-from fastapi import FastAPI, Query, HTTPException, Depends, Request, APIRouter # Import Request, APIRouter
+from fastapi import (
+    FastAPI,
+    Query,
+    HTTPException,
+    Depends,
+    Request,
+    APIRouter,
+)  # Import Request, APIRouter
 from pydantic import BaseModel, Field
 import logging
 import os
@@ -16,7 +23,7 @@ import sys
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.prophet_forecaster import ProphetForecaster
 from models.promo_uplift_model import PromoUpliftModel
-from database.connection import cached # Keep cached decorator
+from database.connection import cached  # Keep cached decorator
 
 # Configure logging
 logging.basicConfig(
@@ -26,7 +33,7 @@ logger = logging.getLogger(__name__)
 
 # Initialize APIRouter instead of FastAPI app
 router = APIRouter(
-    prefix="", # Prefix will be handled by main app
+    prefix="",  # Prefix will be handled by main app
     tags=["forecast"],
     responses={404: {"description": "Not found"}},
 )
@@ -133,7 +140,7 @@ def get_promo_model():
 
 
 async def fetch_historical_data(
-    db_manager_instance: Any, # Accept DatabaseManager instance
+    db_manager_instance: Any,  # Accept DatabaseManager instance
     store_id: Optional[int] = None,
     product_id: Optional[int] = None,
     category_id: Optional[int] = None,
@@ -147,7 +154,7 @@ async def fetch_historical_data(
     Returns:
         pd.DataFrame: Historical sales data
     """
-    manager = db_manager_instance # Use the passed instance
+    manager = db_manager_instance  # Use the passed instance
 
     query = """
     SELECT 
@@ -169,7 +176,7 @@ async def fetch_historical_data(
     WHERE 1=1
     """
 
-    params = [] # Use list for asyncpg params
+    params = []  # Use list for asyncpg params
     param_count = 1
 
     if store_id is not None:
@@ -215,7 +222,7 @@ async def fetch_historical_data(
 
 
 async def fetch_weather_data(
-    db_manager_instance: Any, # Accept DatabaseManager instance
+    db_manager_instance: Any,  # Accept DatabaseManager instance
     city_id: Optional[int] = None,
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
@@ -233,7 +240,7 @@ async def fetch_weather_data(
     Returns:
         pd.DataFrame: Weather data
     """
-    manager = db_manager_instance # Use the passed instance
+    manager = db_manager_instance  # Use the passed instance
 
     # First try to get historical weather data
     query = """
@@ -249,7 +256,7 @@ async def fetch_weather_data(
     WHERE 1=1
     """
 
-    params = [] # Use list for asyncpg params
+    params = []  # Use list for asyncpg params
     param_count = 1
 
     if city_id is not None:
@@ -310,7 +317,7 @@ async def fetch_weather_data(
 
 
 async def fetch_promotion_data(
-    db_manager_instance: Any, # Accept DatabaseManager instance
+    db_manager_instance: Any,  # Accept DatabaseManager instance
     store_id: Optional[int] = None,
     product_id: Optional[int] = None,
     category_id: Optional[int] = None,
@@ -324,7 +331,7 @@ async def fetch_promotion_data(
     Returns:
         pd.DataFrame: Promotion data
     """
-    manager = db_manager_instance # Use the passed instance
+    manager = db_manager_instance  # Use the passed instance
 
     query = """
     SELECT 
@@ -340,7 +347,7 @@ async def fetch_promotion_data(
     WHERE 1=1
     """
 
-    params = [] # Use list for asyncpg params
+    params = []  # Use list for asyncpg params
     param_count = 1
 
     if store_id is not None:
@@ -390,7 +397,7 @@ async def fetch_promotion_data(
 
 
 async def fetch_holiday_data(
-    db_manager_instance: Any, # Accept DatabaseManager instance
+    db_manager_instance: Any,  # Accept DatabaseManager instance
     start_date: Optional[str] = None,
     end_date: Optional[str] = None,
     future_periods: int = 0,
@@ -401,7 +408,7 @@ async def fetch_holiday_data(
     Returns:
         pd.DataFrame: Holiday data
     """
-    manager = db_manager_instance # Use the passed instance
+    manager = db_manager_instance  # Use the passed instance
 
     query = """
     SELECT 
@@ -413,7 +420,7 @@ async def fetch_holiday_data(
     WHERE 1=1
     """
 
-    params = [] # Use list for asyncpg params
+    params = []  # Use list for asyncpg params
     param_count = 1
 
     if start_date is not None:
@@ -448,7 +455,7 @@ async def read_root():
 @router.post("/forecast/", response_model=ForecastResponse)
 async def create_forecast(
     request: ForecastRequest,
-    fastapi_request: Request, # Move FastAPI Request object here
+    fastapi_request: Request,  # Move FastAPI Request object here
     model: ProphetForecaster = Depends(get_forecast_model),
 ):
     """
@@ -474,23 +481,36 @@ async def create_forecast(
     """
     websocket_manager = None
     forecast_name = "Sales Forecast"
-    manager = None # Initialize manager to None
+    manager = None  # Initialize manager to None
 
     try:
         # Conditionally initialize managers only if fastapi_request object is available and app state is ready
-        if fastapi_request and hasattr(fastapi_request.app.state, 'websocket_manager') and hasattr(fastapi_request.app.state, 'db_manager'):
+        if (
+            fastapi_request
+            and hasattr(fastapi_request.app.state, "websocket_manager")
+            and hasattr(fastapi_request.app.state, "db_manager")
+        ):
             websocket_manager = fastapi_request.app.state.websocket_manager
             manager = fastapi_request.app.state.db_manager
-            if fastapi_request and hasattr(fastapi_request, 'scope') and fastapi_request.scope["type"] == "http" and fastapi_request.method == "POST":
-                await websocket_manager.broadcast(f"Notification: {forecast_name} generation started...")
+            if (
+                fastapi_request
+                and hasattr(fastapi_request, "scope")
+                and fastapi_request.scope["type"] == "http"
+                and fastapi_request.method == "POST"
+            ):
+                await websocket_manager.broadcast(
+                    f"Notification: {forecast_name} generation started..."
+                )
         else:
-            logger.debug(f"FastAPI request object or app state not fully initialized for {forecast_name}. Skipping initial broadcast.")
+            logger.debug(
+                f"FastAPI request object or app state not fully initialized for {forecast_name}. Skipping initial broadcast."
+            )
 
         model = get_forecast_model()
-        if not manager: # Check if manager is None after conditional initialization
+        if not manager:  # Check if manager is None after conditional initialization
             raise RuntimeError("Database manager not initialized.")
         df = await fetch_historical_data(
-            manager, # Pass the manager instance here
+            manager,  # Pass the manager instance here
             store_id=request.store_id,
             product_id=request.product_id,
             category_id=request.category_id,
@@ -500,12 +520,30 @@ async def create_forecast(
         )
 
         if df is None or df.empty:
-            if websocket_manager and fastapi_request and hasattr(fastapi_request, 'scope') and fastapi_request.scope["type"] == "http" and fastapi_request.method == "POST":
-                await websocket_manager.broadcast(f"Notification: {forecast_name} failed - No historical data.")
-            raise HTTPException(status_code=400, detail="No historical data for forecasting.")
+            if (
+                websocket_manager
+                and fastapi_request
+                and hasattr(fastapi_request, "scope")
+                and fastapi_request.scope["type"] == "http"
+                and fastapi_request.method == "POST"
+            ):
+                await websocket_manager.broadcast(
+                    f"Notification: {forecast_name} failed - No historical data."
+                )
+            raise HTTPException(
+                status_code=400, detail="No historical data for forecasting."
+            )
 
-        if websocket_manager and fastapi_request and hasattr(fastapi_request, 'scope') and fastapi_request.scope["type"] == "http" and fastapi_request.method == "POST":
-            await websocket_manager.broadcast(f"Notification: Historical data fetched for {forecast_name}.")
+        if (
+            websocket_manager
+            and fastapi_request
+            and hasattr(fastapi_request, "scope")
+            and fastapi_request.scope["type"] == "http"
+            and fastapi_request.method == "POST"
+        ):
+            await websocket_manager.broadcast(
+                f"Notification: Historical data fetched for {forecast_name}."
+            )
 
         from services.forecast_service import generate_forecast
 
@@ -514,7 +552,7 @@ async def create_forecast(
             request=request,
             request_obj=fastapi_request,
             fetch_historical_data_fn=lambda **kwargs: fetch_historical_data(
-                manager, # Pass the manager instance
+                manager,  # Pass the manager instance
                 store_id=request.store_id,
                 product_id=request.product_id,
                 category_id=request.category_id,
@@ -523,13 +561,13 @@ async def create_forecast(
                 end_date=None,
             ),
             fetch_weather_data_fn=lambda **kwargs: fetch_weather_data(
-                manager, # Pass the manager instance
+                manager,  # Pass the manager instance
                 city_id=request.city_id,
                 start_date=request.start_date,
                 end_date=None,
             ),
             fetch_promotion_data_fn=lambda **kwargs: fetch_promotion_data(
-                manager, # Pass the manager instance
+                manager,  # Pass the manager instance
                 store_id=request.store_id,
                 product_id=request.product_id,
                 category_id=request.category_id,
@@ -538,37 +576,69 @@ async def create_forecast(
             ),
         )
 
-        if websocket_manager and fastapi_request and hasattr(fastapi_request, 'scope') and fastapi_request.scope["type"] == "http" and fastapi_request.method == "POST":
-            await websocket_manager.broadcast(f"Notification: {forecast_name} generated successfully. Analyzing insights...")
+        if (
+            websocket_manager
+            and fastapi_request
+            and hasattr(fastapi_request, "scope")
+            and fastapi_request.scope["type"] == "http"
+            and fastapi_request.method == "POST"
+        ):
+            await websocket_manager.broadcast(
+                f"Notification: {forecast_name} generated successfully. Analyzing insights..."
+            )
 
         # Example of generating insights based on forecast result
         # In a real scenario, this would involve more complex logic
         if result and result.get("forecast"):
-            avg_forecast = sum([item["forecast"] for item in result["forecast"]]) / len(result["forecast"])
-            if websocket_manager and fastapi_request and hasattr(fastapi_request, 'scope') and fastapi_request.scope["type"] == "http" and fastapi_request.method == "POST":
-                if avg_forecast < 50: # Example threshold for low sales
+            avg_forecast = sum([item["forecast"] for item in result["forecast"]]) / len(
+                result["forecast"]
+            )
+            if (
+                websocket_manager
+                and fastapi_request
+                and hasattr(fastapi_request, "scope")
+                and fastapi_request.scope["type"] == "http"
+                and fastapi_request.method == "POST"
+            ):
+                if avg_forecast < 50:  # Example threshold for low sales
                     insight_message = f"Insight for {forecast_name}: Average predicted sales are low ({avg_forecast:.2f}). Consider promotions or inventory adjustments."
-                elif avg_forecast > 200: # Example threshold for high sales
+                elif avg_forecast > 200:  # Example threshold for high sales
                     insight_message = f"Insight for {forecast_name}: Average predicted sales are high ({avg_forecast:.2f}). Ensure sufficient stock levels."
                 else:
                     insight_message = f"Insight for {forecast_name}: Sales predictions are stable ({avg_forecast:.2f})."
                 await websocket_manager.broadcast(f"Notification: {insight_message}")
 
-        if websocket_manager and fastapi_request and hasattr(fastapi_request, 'scope') and fastapi_request.scope["type"] == "http" and fastapi_request.method == "POST":
-            await websocket_manager.broadcast(f"Notification: {forecast_name} processing complete.")
+        if (
+            websocket_manager
+            and fastapi_request
+            and hasattr(fastapi_request, "scope")
+            and fastapi_request.scope["type"] == "http"
+            and fastapi_request.method == "POST"
+        ):
+            await websocket_manager.broadcast(
+                f"Notification: {forecast_name} processing complete."
+            )
         return result
 
     except Exception as e:
         logger.error(f"Forecast error in {forecast_name}: {str(e)}")
-        if websocket_manager and fastapi_request and hasattr(fastapi_request, 'scope') and fastapi_request.scope["type"] == "http" and fastapi_request.method == "POST":
-            await websocket_manager.broadcast(f"Notification: {forecast_name} failed due to an error: {str(e)}")
+        if (
+            websocket_manager
+            and fastapi_request
+            and hasattr(fastapi_request, "scope")
+            and fastapi_request.scope["type"] == "http"
+            and fastapi_request.method == "POST"
+        ):
+            await websocket_manager.broadcast(
+                f"Notification: {forecast_name} failed due to an error: {str(e)}"
+            )
         raise HTTPException(status_code=500, detail=f"Forecast error: {str(e)}")
 
 
 @router.post("/promotion/analysis/")
-async def analyze_promotion( # Make async
+async def analyze_promotion(  # Make async
     request: PromotionAnalysisRequest,
-    fastapi_request: Request, # Move FastAPI Request object here
+    fastapi_request: Request,  # Move FastAPI Request object here
     model: PromoUpliftModel = Depends(get_promo_model),
 ):
     """
@@ -588,12 +658,14 @@ async def analyze_promotion( # Make async
     Returns:
     - Promotion effectiveness analysis
     """
-    manager = None # Initialize manager to None
+    manager = None  # Initialize manager to None
     try:
-        if fastapi_request and hasattr(fastapi_request.app.state, 'db_manager'): # Ensure fastapi_request is not None and app state has db_manager
-            manager = fastapi_request.app.state.db_manager # Get manager here
+        if fastapi_request and hasattr(
+            fastapi_request.app.state, "db_manager"
+        ):  # Ensure fastapi_request is not None and app state has db_manager
+            manager = fastapi_request.app.state.db_manager  # Get manager here
 
-        if not manager: # Check if manager is None after conditional initialization
+        if not manager:  # Check if manager is None after conditional initialization
             raise RuntimeError("Database manager not initialized.")
 
         # Parse dates
@@ -602,8 +674,8 @@ async def analyze_promotion( # Make async
 
         # Get historical data for training (1 year back from start date)
         hist_start_date = start_date - timedelta(days=365)
-        df = await fetch_historical_data( # Await this call
-            manager, # Pass the manager instance
+        df = await fetch_historical_data(  # Await this call
+            manager,  # Pass the manager instance
             store_id=request.store_id,
             product_id=request.product_id,
             category_id=request.category_id,
@@ -618,8 +690,8 @@ async def analyze_promotion( # Make async
             )
 
         # Get promotion data
-        promo_data = await fetch_promotion_data( # Await this call
-            manager, # Pass the manager instance
+        promo_data = await fetch_promotion_data(  # Await this call
+            manager,  # Pass the manager instance
             store_id=request.store_id,
             product_id=request.product_id,
             category_id=request.category_id,
@@ -697,7 +769,9 @@ async def analyze_promotion( # Make async
 
 
 @router.post("/stockout/analysis/")
-async def analyze_stockout(request: StockoutAnalysisRequest, fastapi_request: Request): # Make async, add FastAPI Request
+async def analyze_stockout(
+    request: StockoutAnalysisRequest, fastapi_request: Request
+):  # Make async, add FastAPI Request
     """
     Analyze the impact of stockouts and estimate demand during stockout periods.
 
@@ -710,12 +784,14 @@ async def analyze_stockout(request: StockoutAnalysisRequest, fastapi_request: Re
     Returns:
     - Stockout analysis with estimated demand during stockout periods
     """
-    manager = None # Initialize manager to None
+    manager = None  # Initialize manager to None
     try:
-        if fastapi_request and hasattr(fastapi_request.app.state, 'db_manager'): # Ensure fastapi_request is not None and app state has db_manager
-            manager = fastapi_request.app.state.db_manager # Get manager here
+        if fastapi_request and hasattr(
+            fastapi_request.app.state, "db_manager"
+        ):  # Ensure fastapi_request is not None and app state has db_manager
+            manager = fastapi_request.app.state.db_manager  # Get manager here
 
-        if not manager: # Check if manager is None after conditional initialization
+        if not manager:  # Check if manager is None after conditional initialization
             raise RuntimeError("Database manager not initialized.")
 
         # Parse dates
@@ -723,8 +799,8 @@ async def analyze_stockout(request: StockoutAnalysisRequest, fastapi_request: Re
         end_date = pd.to_datetime(request.end_date)
 
         # Get historical data
-        df = await fetch_historical_data( # Await this call
-            manager, # Pass the manager instance
+        df = await fetch_historical_data(  # Await this call
+            manager,  # Pass the manager instance
             store_id=request.store_id,
             product_id=request.product_id,
             start_date=start_date.strftime("%Y-%m-%d")
@@ -804,7 +880,9 @@ async def analyze_stockout(request: StockoutAnalysisRequest, fastapi_request: Re
 
 
 @router.post("/holiday/impact/")
-async def analyze_holiday_impact(request: HolidayImpactRequest, fastapi_request: Request): # Make async, add FastAPI Request
+async def analyze_holiday_impact(
+    request: HolidayImpactRequest, fastapi_request: Request
+):  # Make async, add FastAPI Request
     """
     Analyze the impact of holidays on sales.
 
@@ -818,12 +896,14 @@ async def analyze_holiday_impact(request: HolidayImpactRequest, fastapi_request:
     Returns:
     - Holiday impact analysis
     """
-    manager = None # Initialize manager to None
+    manager = None  # Initialize manager to None
     try:
-        if fastapi_request and hasattr(fastapi_request.app.state, 'db_manager'): # Ensure fastapi_request is not None and app state has db_manager
-            manager = fastapi_request.app.state.db_manager # Get manager here
+        if fastapi_request and hasattr(
+            fastapi_request.app.state, "db_manager"
+        ):  # Ensure fastapi_request is not None and app state has db_manager
+            manager = fastapi_request.app.state.db_manager  # Get manager here
 
-        if not manager: # Check if manager is None after conditional initialization
+        if not manager:  # Check if manager is None after conditional initialization
             raise RuntimeError("Database manager not initialized.")
 
         # Parse dates
@@ -831,8 +911,8 @@ async def analyze_holiday_impact(request: HolidayImpactRequest, fastapi_request:
         end_date = pd.to_datetime(request.end_date)
 
         # Get historical data
-        df = await fetch_historical_data( # Await this call
-            manager, # Pass the manager instance
+        df = await fetch_historical_data(  # Await this call
+            manager,  # Pass the manager instance
             product_id=request.product_id,
             category_id=request.category_id,
             start_date=start_date.strftime("%Y-%m-%d"),
@@ -845,8 +925,8 @@ async def analyze_holiday_impact(request: HolidayImpactRequest, fastapi_request:
             )
 
         # Get holiday data
-        holidays_df = await fetch_holiday_data( # Await this call
-            manager, # Pass the manager instance
+        holidays_df = await fetch_holiday_data(  # Await this call
+            manager,  # Pass the manager instance
             start_date=start_date.strftime("%Y-%m-%d"),
             end_date=end_date.strftime("%Y-%m-%d"),
         )
@@ -959,4 +1039,4 @@ if __name__ == "__main__":
     # This block is no longer needed as this file defines a router, not a standalone app
     # import uvicorn
     # uvicorn.run(app, host="0.0.0.0", port=8000)
-    pass # Keep pass to avoid empty file warning
+    pass  # Keep pass to avoid empty file warning

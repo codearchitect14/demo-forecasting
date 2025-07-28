@@ -6,17 +6,18 @@ import os
 from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
-from fastapi.middleware.cors import CORSMiddleware # Import CORSMiddleware
+from fastapi.middleware.cors import CORSMiddleware  # Import CORSMiddleware
 from app.api import app as api_app
 from dotenv import load_dotenv
-from database.connection import DatabaseManager # Import DatabaseManager class directly
-import logging # Import logging
+from database.connection import DatabaseManager  # Import DatabaseManager class directly
+import logging  # Import logging
 
 load_dotenv()
 
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
 
 # Connection Manager for WebSockets
 class ConnectionManager:
@@ -40,8 +41,11 @@ class ConnectionManager:
             try:
                 await connection.send_text(message)
             except RuntimeError as e:
-                logger.error(f"Error sending message to WebSocket {connection.client}: {e}")
-                self.active_connections.remove(connection) # Remove broken connection
+                logger.error(
+                    f"Error sending message to WebSocket {connection.client}: {e}"
+                )
+                self.active_connections.remove(connection)  # Remove broken connection
+
 
 app = FastAPI()
 
@@ -99,18 +103,25 @@ async def websocket_endpoint(websocket: WebSocket):
 
 # Mount the API under /api
 # app.mount("/api", api_app) # Removed app.mount
-app.include_router(api_app, prefix="/api") # Use include_router instead to share app.state
+app.include_router(
+    api_app, prefix="/api"
+)  # Use include_router instead to share app.state
+
 
 # Add startup and shutdown events
 @app.on_event("startup")
 async def startup_event():
-    app.state.db_manager = DatabaseManager() # Instantiate DatabaseManager directly
+    app.state.db_manager = DatabaseManager()  # Instantiate DatabaseManager directly
     await app.state.db_manager.initialize()
-    app.state.websocket_manager = ConnectionManager() # Instantiate WebSocket ConnectionManager
+    app.state.websocket_manager = (
+        ConnectionManager()
+    )  # Instantiate WebSocket ConnectionManager
+
 
 @app.on_event("shutdown")
 async def shutdown_event():
     await app.state.db_manager.close()
+
 
 # Add enhanced endpoints directly to main app
 try:

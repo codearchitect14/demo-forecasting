@@ -14,7 +14,7 @@ import json
 from dataclasses import dataclass
 from scipy.spatial.distance import pdist, squareform
 from sklearn.cluster import DBSCAN
-from fastapi import Request # Import Request
+from fastapi import Request  # Import Request
 
 from utils.logger import get_logger
 
@@ -71,9 +71,15 @@ class InventoryOptimizationService:
         """Identify cross-store inventory optimization opportunities."""
         try:
             # Get comprehensive inventory analysis
-            inventory_data = await self._get_inventory_analysis(request, city_id) # Pass request
-            store_profiles = await self._generate_store_profiles(request, city_id) # Pass request
-            transfer_costs = await self._calculate_transfer_costs(request, city_id) # Pass request
+            inventory_data = await self._get_inventory_analysis(
+                request, city_id
+            )  # Pass request
+            store_profiles = await self._generate_store_profiles(
+                request, city_id
+            )  # Pass request
+            transfer_costs = await self._calculate_transfer_costs(
+                request, city_id
+            )  # Pass request
 
             opportunities = []
 
@@ -90,7 +96,9 @@ class InventoryOptimizationService:
             opportunities = self._prioritize_opportunities(opportunities)
 
             # Store analysis results
-            await self._store_optimization_analysis(opportunities, request) # Pass request
+            await self._store_optimization_analysis(
+                opportunities, request
+            )  # Pass request
 
             return opportunities[:50]  # Return top 50 opportunities
 
@@ -104,7 +112,7 @@ class InventoryOptimizationService:
         """Get comprehensive inventory analysis across stores."""
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 WITH inventory_metrics AS (
                     SELECT 
@@ -173,7 +181,10 @@ class InventoryOptimizationService:
 
                 # Parameters for the main query: safety_stock_multiplier, overstock_threshold_days
                 # If city_id is present, it will be the 3rd parameter ($3)
-                query_params = [self.optimization_params["safety_stock_multiplier"], self.optimization_params["overstock_threshold_days"]]
+                query_params = [
+                    self.optimization_params["safety_stock_multiplier"],
+                    self.optimization_params["overstock_threshold_days"],
+                ]
                 if city_id is not None:
                     query_params.append(city_id)
 
@@ -191,7 +202,7 @@ class InventoryOptimizationService:
         """Generate comprehensive profiles for each store."""
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 WITH store_metrics AS (
                     SELECT 
@@ -259,7 +270,7 @@ class InventoryOptimizationService:
         """Calculate transfer costs between stores based on distance."""
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 SELECT 
                     store_id,
@@ -581,7 +592,9 @@ class InventoryOptimizationService:
         except Exception as e:
             self.logger.error(f"Error storing optimization analysis: {e}")
 
-    async def get_store_optimization_summary(self, request: Request, store_id: int) -> Dict[str, Any]:
+    async def get_store_optimization_summary(
+        self, request: Request, store_id: int
+    ) -> Dict[str, Any]:
         """Get optimization summary for a specific store."""
         try:
             manager = request.app.state.db_manager
@@ -642,7 +655,9 @@ class InventoryOptimizationService:
             self.logger.error(f"Error getting store optimization summary: {e}")
             return {}
 
-    async def get_city_optimization_overview(self, request: Request, city_id: int) -> Dict[str, Any]:
+    async def get_city_optimization_overview(
+        self, request: Request, city_id: int
+    ) -> Dict[str, Any]:
         """Get optimization overview for an entire city."""
         try:
             manager = request.app.state.db_manager
@@ -675,7 +690,12 @@ class InventoryOptimizationService:
             return {}
 
     async def execute_transfer_recommendation(
-        self, source_store_id: int, target_store_id: int, product_id: int, quantity: int, request: Request
+        self,
+        source_store_id: int,
+        target_store_id: int,
+        product_id: int,
+        quantity: int,
+        request: Request,
     ) -> Dict[str, Any]:
         """Simulate execution of a transfer recommendation."""
         try:

@@ -41,7 +41,9 @@ class CompetitiveIntelligenceService:
     def __init__(self):
         pass
 
-    async def analyze_competitive_landscape(self, request: Request, city_id: int, store_id: int):
+    async def analyze_competitive_landscape(
+        self, request: Request, city_id: int, store_id: int
+    ):
         # Simulated data for now
         return {
             "market_share": 25.0 + (city_id % 5) * 2.0,
@@ -56,7 +58,9 @@ class CustomerBehaviorService:
     def __init__(self):
         pass
 
-    async def analyze_customer_behavior(self, request: Request, city_id: int, store_id: int):
+    async def analyze_customer_behavior(
+        self, request: Request, city_id: int, store_id: int
+    ):
         # Simulated data for now
         return {
             "customer_segments": ["Loyal", "New", "Churn Risk"],
@@ -222,7 +226,9 @@ async def ensemble_forecast(request_body: EnsembleForecastRequest, request: Requ
     try:
         # Ensure weights sum to 1
         total_weight = (
-            request_body.prophet_weight + request_body.xgboost_weight + request_body.rf_weight
+            request_body.prophet_weight
+            + request_body.xgboost_weight
+            + request_body.rf_weight
         )
         if abs(total_weight - 1.0) > 0.01:
             raise HTTPException(status_code=400, detail="Model weights must sum to 1.0")
@@ -287,7 +293,9 @@ async def ensemble_forecast(request_body: EnsembleForecastRequest, request: Requ
 
 @router.post("/cross-store-comparison")
 @cached(ttl=300)
-async def cross_store_comparison(request_body: CrossStoreComparisonRequest, request: Request):
+async def cross_store_comparison(
+    request_body: CrossStoreComparisonRequest, request: Request
+):
     """Cross-store performance analysis with real-time data"""
     try:
         # Use dynamic store service for real data
@@ -579,7 +587,9 @@ async def cross_store_comparison(request_body: CrossStoreComparisonRequest, requ
 
 @router.post("/weather-correlation")
 @cached(ttl=300)
-async def weather_correlation_analysis(request_body: WeatherCorrelationRequest, request: Request):
+async def weather_correlation_analysis(
+    request_body: WeatherCorrelationRequest, request: Request
+):
     """
     🌤️ COMPREHENSIVE MULTI-MODAL WEATHER INTELLIGENCE SYSTEM
 
@@ -669,7 +679,10 @@ async def weather_correlation_analysis(request_body: WeatherCorrelationRequest, 
 
         # 🎯 WEATHER-PROMOTION INTERACTION ANALYSIS
         promotion_weather_analysis = await analyze_weather_promotion_interaction(
-            weather_data, request_body.city_id, request_body.store_id, request_body.product_id
+            weather_data,
+            request_body.city_id,
+            request_body.store_id,
+            request_body.product_id,
         )
 
         # 🔮 PREDICTIVE WEATHER FORECASTING
@@ -1310,7 +1323,9 @@ async def generate_intelligent_weather_analysis(request):
 
 @router.post("/promotion-impact")
 @cached(ttl=300)
-async def promotion_impact_analysis(request_body: PromotionImpactRequest, request: Request):
+async def promotion_impact_analysis(
+    request_body: PromotionImpactRequest, request: Request
+):
     """
     Enhanced promotion impact analysis with optimization insights
     """
@@ -1336,7 +1351,9 @@ async def promotion_impact_analysis(request_body: PromotionImpactRequest, reques
 
         # Adjust uplift based on discount level proximity to historical best
         if best_discount > 0:
-            discount_efficiency = min(1.5, request_body.discount_percent / best_discount)
+            discount_efficiency = min(
+                1.5, request_body.discount_percent / best_discount
+            )
             estimated_uplift = base_uplift * discount_efficiency
         else:
             estimated_uplift = base_uplift * (request_body.discount_percent / 20.0)
@@ -1448,7 +1465,9 @@ async def promotion_impact_analysis(request_body: PromotionImpactRequest, reques
 
 @router.post("/stockout-prediction")
 @cached(ttl=300)
-async def stockout_prediction_analysis(request_body: StockoutPredictionRequest, request: Request):
+async def stockout_prediction_analysis(
+    request_body: StockoutPredictionRequest, request: Request
+):
     """
     Enhanced stockout risk prediction with optimization recommendations
     """
@@ -1480,7 +1499,9 @@ async def stockout_prediction_analysis(request_body: StockoutPredictionRequest, 
             risk_score = max(10, base_risk * 0.7)
 
         # Calculate reorder recommendation
-        safety_stock = demand_rate * request_body.lead_time * (request_body.service_level / 100)
+        safety_stock = (
+            demand_rate * request_body.lead_time * (request_body.service_level / 100)
+        )
         recommended_reorder = int(demand_rate * request_body.lead_time + safety_stock)
 
         return {
@@ -1538,7 +1559,9 @@ async def stockout_prediction_analysis(request_body: StockoutPredictionRequest, 
 
 @router.get("/dynamic-insights/{city_id}/{store_id}/{product_id}")
 @cached(ttl=300)
-async def get_dynamic_insights(city_id: int, store_id: int, product_id: int, request: Request):
+async def get_dynamic_insights(
+    city_id: int, store_id: int, product_id: int, request: Request
+):
     """Get real-time calculated insights to replace all hardcoded frontend values"""
     try:
         # Get real sales data for calculations
@@ -1986,7 +2009,10 @@ async def weather_demand_forecasting(request_body: Dict[str, Any], request: Requ
         weather_service = DynamicWeatherService()
         weather_data = await weather_service.get_weather_data(
             request,
-            store_id=store_id, product_id=product_id, city_id=city_id, limit=5000
+            store_id=store_id,
+            product_id=product_id,
+            city_id=city_id,
+            limit=5000,
         )
 
         if weather_data.empty:
@@ -2146,7 +2172,9 @@ async def weather_demand_forecasting(request_body: Dict[str, Any], request: Requ
 
 @router.post("/weather-promotion-optimization")
 @cached(ttl=300)
-async def weather_promotion_optimization(request_body: Dict[str, Any], request: Request):
+async def weather_promotion_optimization(
+    request_body: Dict[str, Any], request: Request
+):
     """
     🌤️ WEATHER-PROMOTION OPTIMIZATION ENGINE
 
@@ -2166,7 +2194,10 @@ async def weather_promotion_optimization(request_body: Dict[str, Any], request: 
         weather_service = DynamicWeatherService()
         weather_data = await weather_service.get_weather_data(
             request,
-            store_id=store_id, product_id=product_id, city_id=city_id, limit=10000
+            store_id=store_id,
+            product_id=product_id,
+            city_id=city_id,
+            limit=10000,
         )
 
         if weather_data.empty:
@@ -2320,7 +2351,10 @@ async def weather_risk_assessment(request_body: Dict[str, Any], request: Request
         weather_service = DynamicWeatherService()
         weather_data = await weather_service.get_weather_data(
             request,
-            store_id=store_id, product_id=product_id, city_id=city_id, limit=8000
+            store_id=store_id,
+            product_id=product_id,
+            city_id=city_id,
+            limit=8000,
         )
 
         if weather_data.empty:
@@ -2447,7 +2481,10 @@ async def weather_scenario_planning(request_body: Dict[str, Any], request: Reque
         weather_service = DynamicWeatherService()
         weather_data = await weather_service.get_weather_data(
             request,
-            store_id=store_id, product_id=product_id, city_id=city_id, limit=12000
+            store_id=store_id,
+            product_id=product_id,
+            city_id=city_id,
+            limit=12000,
         )
 
         if weather_data.empty:
@@ -3532,7 +3569,10 @@ async def seasonal_patterns_analysis(request_body: Dict[str, Any], request: Requ
         weather_service = DynamicWeatherService()
         weather_data = await weather_service.get_weather_data(
             request,
-            store_id=store_id, product_id=product_id, city_id=city_id, limit=10000
+            store_id=store_id,
+            product_id=product_id,
+            city_id=city_id,
+            limit=10000,
         )
 
         if weather_data.empty:
@@ -3662,7 +3702,10 @@ async def weather_scenarios_analysis(request_body: Dict[str, Any], request: Requ
         weather_service = DynamicWeatherService()
         weather_data = await weather_service.get_weather_data(
             request,
-            store_id=store_id, product_id=product_id, city_id=city_id, limit=10000
+            store_id=store_id,
+            product_id=product_id,
+            city_id=city_id,
+            limit=10000,
         )
 
         if weather_data.empty:
@@ -3839,7 +3882,10 @@ async def climate_impact_analysis(request_body: Dict[str, Any], request: Request
         weather_service = DynamicWeatherService()
         weather_data = await weather_service.get_weather_data(
             request,
-            store_id=store_id, product_id=product_id, city_id=city_id, limit=10000
+            store_id=store_id,
+            product_id=product_id,
+            city_id=city_id,
+            limit=10000,
         )
 
         if weather_data.empty:
@@ -4257,11 +4303,11 @@ async def category_performance_analysis(request_body: Dict[str, Any], request: R
     try:
         category_id = request_body.get("category_id")
         store_id = request_body.get("store_id")
-        
-        category_service = DynamicCategoryService() # Instantiate service
+
+        category_service = DynamicCategoryService()  # Instantiate service
         # Get category performance data
         category_insights = await category_service.analyze_category_performance(
-            request, store_id=store_id, category_id=category_id # Pass request object
+            request, store_id=store_id, category_id=category_id  # Pass request object
         )
 
         if not category_insights or "error" in category_insights:
@@ -4290,9 +4336,11 @@ async def market_share_analysis(request_body: Dict[str, Any], request: Request):
         store_id = request_body.get("store_id")
         category_id = request_body.get("category_id")
 
-        category_service = DynamicCategoryService() # Instantiate service
+        category_service = DynamicCategoryService()  # Instantiate service
         # Get market share data
-        market_data = await category_service.analyze_market_share(request, store_id=store_id, category_id=category_id) # Pass request object
+        market_data = await category_service.analyze_market_share(
+            request, store_id=store_id, category_id=category_id
+        )  # Pass request object
 
         if not market_data or "error" in market_data:
             return await generate_simulated_market_share(request_body)
@@ -4310,7 +4358,9 @@ async def market_share_analysis(request_body: Dict[str, Any], request: Request):
 
 
 @router.post("/portfolio-optimization")
-async def portfolio_optimization_analysis(request_body: Dict[str, Any], request: Request):
+async def portfolio_optimization_analysis(
+    request_body: Dict[str, Any], request: Request
+):
     """
     🎯 PORTFOLIO OPTIMIZATION
 
@@ -4320,9 +4370,11 @@ async def portfolio_optimization_analysis(request_body: Dict[str, Any], request:
         store_id = request_body.get("store_id")
         category_id = request_body.get("category_id")
 
-        category_service = DynamicCategoryService() # Instantiate service
+        category_service = DynamicCategoryService()  # Instantiate service
         # Get portfolio optimization data
-        portfolio_data = await category_service.optimize_product_portfolio(request, store_id=store_id, category_id=category_id) # Pass request object
+        portfolio_data = await category_service.optimize_product_portfolio(
+            request, store_id=store_id, category_id=category_id
+        )  # Pass request object
 
         if not portfolio_data or "error" in portfolio_data:
             return await generate_simulated_portfolio_optimization(request_body)
@@ -4340,7 +4392,9 @@ async def portfolio_optimization_analysis(request_body: Dict[str, Any], request:
 
 
 @router.post("/category-correlations")
-async def category_correlations_analysis(request_body: Dict[str, Any], request: Request):
+async def category_correlations_analysis(
+    request_body: Dict[str, Any], request: Request
+):
     """
     🔗 CATEGORY CORRELATIONS
 
@@ -4350,9 +4404,11 @@ async def category_correlations_analysis(request_body: Dict[str, Any], request: 
         store_id = request_body.get("store_id")
         category_id = request_body.get("category_id")
 
-        category_service = DynamicCategoryService() # Instantiate service
+        category_service = DynamicCategoryService()  # Instantiate service
         # Get category correlation data
-        correlation_data = await category_service.analyze_category_correlations(request, store_id=store_id, category_id=category_id) # Pass request object
+        correlation_data = await category_service.analyze_category_correlations(
+            request, store_id=store_id, category_id=category_id
+        )  # Pass request object
 
         if not correlation_data or "error" in correlation_data:
             return await generate_simulated_category_correlations(request_body)
@@ -4384,9 +4440,11 @@ async def store_clustering_analysis(request_body: Dict[str, Any], request: Reque
     try:
         store_id = request_body.get("store_id")
 
-        store_service = DynamicStoreService() # Instantiate service
+        store_service = DynamicStoreService()  # Instantiate service
         # Get store clustering data
-        clustering_data = await store_service.analyze_store_clustering(request, store_id=store_id) # Pass request object
+        clustering_data = await store_service.analyze_store_clustering(
+            request, store_id=store_id
+        )  # Pass request object
 
         if not clustering_data or "error" in clustering_data:
             return await generate_simulated_store_clustering(request_body)
@@ -4413,9 +4471,11 @@ async def performance_ranking_analysis(request_body: Dict[str, Any], request: Re
     try:
         store_id = request_body.get("store_id")
 
-        store_service = DynamicStoreService() # Instantiate service
+        store_service = DynamicStoreService()  # Instantiate service
         # Get performance ranking data
-        ranking_data = await store_service.analyze_store_performance_ranking(request, store_id=store_id) # Pass request object
+        ranking_data = await store_service.analyze_store_performance_ranking(
+            request, store_id=store_id
+        )  # Pass request object
 
         if not ranking_data or "error" in ranking_data:
             return await generate_simulated_performance_ranking(request_body)
@@ -4442,9 +4502,11 @@ async def best_practices_analysis(request_body: Dict[str, Any], request: Request
     try:
         store_id = request_body.get("store_id")
 
-        store_service = DynamicStoreService() # Instantiate service
+        store_service = DynamicStoreService()  # Instantiate service
         # Get best practices data
-        practices_data = await store_service.identify_best_practices(request, store_id=store_id) # Pass request object
+        practices_data = await store_service.identify_best_practices(
+            request, store_id=store_id
+        )  # Pass request object
 
         if not practices_data or "error" in practices_data:
             return await generate_simulated_best_practices(request_body)
@@ -4471,9 +4533,11 @@ async def anomaly_detection_analysis(request_body: Dict[str, Any], request: Requ
     try:
         store_id = request_body.get("store_id")
 
-        store_service = DynamicStoreService() # Instantiate service
+        store_service = DynamicStoreService()  # Instantiate service
         # Get anomaly detection data
-        anomaly_data = await store_service.detect_store_anomalies(request, store_id=store_id) # Pass request object
+        anomaly_data = await store_service.detect_store_anomalies(
+            request, store_id=store_id
+        )  # Pass request object
 
         if not anomaly_data or "error" in anomaly_data:
             return await generate_simulated_anomaly_detection(request_body)
@@ -4496,7 +4560,9 @@ async def anomaly_detection_analysis(request_body: Dict[str, Any], request: Requ
 
 
 @router.post("/cross-product-effects")
-async def cross_product_effects_analysis(request_body: Dict[str, Any], request: Request):
+async def cross_product_effects_analysis(
+    request_body: Dict[str, Any], request: Request
+):
     """
     🔄 CROSS-PRODUCT EFFECTS
 
@@ -4507,10 +4573,13 @@ async def cross_product_effects_analysis(request_body: Dict[str, Any], request: 
         product_id = request_body.get("product_id")
         city_id = request_body.get("city_id")
 
-        promotion_service = DynamicPromotionService() # Instantiate service
+        promotion_service = DynamicPromotionService()  # Instantiate service
         # Get cross-product effects data
         effects_data = await promotion_service.analyze_cross_product_effects(
-            request, store_id=store_id, product_id=product_id, city_id=city_id # Pass request object
+            request,
+            store_id=store_id,
+            product_id=product_id,
+            city_id=city_id,  # Pass request object
         )
 
         if not effects_data or "error" in effects_data:
@@ -4540,10 +4609,13 @@ async def optimal_pricing_analysis(request_body: Dict[str, Any], request: Reques
         product_id = request_body.get("product_id")
         city_id = request_body.get("city_id")
 
-        promotion_service = DynamicPromotionService() # Instantiate service
+        promotion_service = DynamicPromotionService()  # Instantiate service
         # Get optimal pricing data
         pricing_data = await promotion_service.analyze_optimal_pricing(
-            request, store_id=store_id, product_id=product_id, city_id=city_id # Pass request object
+            request,
+            store_id=store_id,
+            product_id=product_id,
+            city_id=city_id,  # Pass request object
         )
 
         if not pricing_data or "error" in pricing_data:
@@ -4573,10 +4645,13 @@ async def roi_optimization_analysis(request_body: Dict[str, Any], request: Reque
         product_id = request_body.get("product_id")
         city_id = request_body.get("city_id")
 
-        promotion_service = DynamicPromotionService() # Instantiate service
+        promotion_service = DynamicPromotionService()  # Instantiate service
         # Get ROI optimization data
         roi_data = await promotion_service.optimize_promotion_roi(
-            request, store_id=store_id, product_id=product_id, city_id=city_id # Pass request object
+            request,
+            store_id=store_id,
+            product_id=product_id,
+            city_id=city_id,  # Pass request object
         )
 
         if not roi_data or "error" in roi_data:
@@ -4600,7 +4675,9 @@ async def roi_optimization_analysis(request_body: Dict[str, Any], request: Reque
 
 
 @router.post("/cross-store-optimization")
-async def cross_store_optimization_analysis(request_body: Dict[str, Any], request: Request):
+async def cross_store_optimization_analysis(
+    request_body: Dict[str, Any], request: Request
+):
     """
     🔄 CROSS-STORE OPTIMIZATION
 
@@ -4610,10 +4687,10 @@ async def cross_store_optimization_analysis(request_body: Dict[str, Any], reques
         store_id = request_body.get("store_id")
         product_id = request_body.get("product_id")
 
-        stockout_service = DynamicStockoutService() # Instantiate service
+        stockout_service = DynamicStockoutService()  # Instantiate service
         # Get cross-store optimization data
         optimization_data = await stockout_service.analyze_cross_store_optimization(
-            request, store_id=store_id, product_id=product_id # Pass request object
+            request, store_id=store_id, product_id=product_id  # Pass request object
         )
 
         if not optimization_data or "error" in optimization_data:
@@ -4643,10 +4720,13 @@ async def safety_stock_analysis(request_body: Dict[str, Any], request: Request):
         product_id = request_body.get("product_id")
         service_level = request_body.get("service_level", 95)
 
-        stockout_service = DynamicStockoutService() # Instantiate service
+        stockout_service = DynamicStockoutService()  # Instantiate service
         # Get safety stock data
         safety_data = await stockout_service.calculate_dynamic_safety_stock(
-            request, store_id=store_id, product_id=product_id, service_level=service_level # Pass request object
+            request,
+            store_id=store_id,
+            product_id=product_id,
+            service_level=service_level,  # Pass request object
         )
 
         if not safety_data or "error" in safety_data:
@@ -4675,10 +4755,10 @@ async def reorder_optimization_analysis(request_body: Dict[str, Any], request: R
         store_id = request_body.get("store_id")
         product_id = request_body.get("product_id")
 
-        stockout_service = DynamicStockoutService() # Instantiate service
+        stockout_service = DynamicStockoutService()  # Instantiate service
         # Get reorder optimization data
         reorder_data = await stockout_service.optimize_reorder_parameters(
-            request, store_id=store_id, product_id=product_id # Pass request object
+            request, store_id=store_id, product_id=product_id  # Pass request object
         )
 
         if not reorder_data or "error" in reorder_data:
@@ -4729,8 +4809,10 @@ async def live_alerts_analysis(request_body: Dict[str, Any], request: Request):
         store_id = request_body.get("store_id")
         severity = request_body.get("severity")
 
-        alerts_service = RealTimeAlertsService() # Instantiate service
-        active_alerts = await alerts_service.get_active_alerts(request, store_id=store_id, severity=severity) # Pass request object
+        alerts_service = RealTimeAlertsService()  # Instantiate service
+        active_alerts = await alerts_service.get_active_alerts(
+            request, store_id=store_id, severity=severity
+        )  # Pass request object
 
         if not active_alerts:
             return await generate_simulated_live_alerts(request_body)
@@ -4759,8 +4841,10 @@ async def demand_monitoring_analysis(request_body: Dict[str, Any], request: Requ
         product_id = request_body.get("product_id")
 
         # This endpoint might use a specific monitoring service or combine data
-        alerts_service = RealTimeAlertsService() # Instantiate service
-        demand_anomalies = await alerts_service._monitor_demand_anomalies([{"store_id": store_id}], request) # Pass request object
+        alerts_service = RealTimeAlertsService()  # Instantiate service
+        demand_anomalies = await alerts_service._monitor_demand_anomalies(
+            [{"store_id": store_id}], request
+        )  # Pass request object
 
         if not demand_anomalies:
             return await generate_simulated_demand_monitoring(request_body)
@@ -4778,7 +4862,9 @@ async def demand_monitoring_analysis(request_body: Dict[str, Any], request: Requ
 
 
 @router.post("/competitive-intelligence")
-async def competitive_intelligence_analysis(request_body: Dict[str, Any], request: Request):
+async def competitive_intelligence_analysis(
+    request_body: Dict[str, Any], request: Request
+):
     """
     🎯 COMPETITIVE INTELLIGENCE
 
@@ -4788,8 +4874,10 @@ async def competitive_intelligence_analysis(request_body: Dict[str, Any], reques
         city_id = request_body.get("city_id")
         store_id = request_body.get("store_id")
 
-        competitive_service = CompetitiveIntelligenceService() # Instantiate service
-        competitive_data = await competitive_service.analyze_competitive_landscape(request, city_id=city_id, store_id=store_id) # Pass request object
+        competitive_service = CompetitiveIntelligenceService()  # Instantiate service
+        competitive_data = await competitive_service.analyze_competitive_landscape(
+            request, city_id=city_id, store_id=store_id
+        )  # Pass request object
 
         if not competitive_data or "error" in competitive_data:
             return await generate_simulated_competitive_intelligence(request_body)
@@ -4817,8 +4905,10 @@ async def customer_behavior_analysis(request_body: Dict[str, Any], request: Requ
         city_id = request_body.get("city_id")
         store_id = request_body.get("store_id")
 
-        customer_service = CustomerBehaviorService() # Instantiate service
-        customer_data = await customer_service.analyze_customer_behavior(request, city_id=city_id, store_id=store_id) # Pass request object
+        customer_service = CustomerBehaviorService()  # Instantiate service
+        customer_data = await customer_service.analyze_customer_behavior(
+            request, city_id=city_id, store_id=store_id
+        )  # Pass request object
 
         if not customer_data or "error" in customer_data:
             return await generate_simulated_customer_behavior(request_body)
@@ -4840,12 +4930,14 @@ async def customer_behavior_analysis(request_body: Dict[str, Any], request: Requ
 # ============================================================================
 
 
-async def generate_simulated_category_performance(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_category_performance(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """Generate simulated category performance data."""
     # Use request_body to make simulation dynamic
     category_id_val = request_body.get("category_id", 0)
     store_id_val = request_body.get("store_id", 0)
-    
+
     return {
         "status": "success",
         "data_source": "intelligent_simulation",
@@ -4867,7 +4959,9 @@ async def generate_simulated_category_performance(request_body: Dict[str, Any]):
     }
 
 
-async def generate_simulated_market_share(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_market_share(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated market share data.
     """
@@ -4886,7 +4980,9 @@ async def generate_simulated_market_share(request_body: Dict[str, Any]): # Add r
     }
 
 
-async def generate_simulated_portfolio_optimization(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_portfolio_optimization(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated portfolio optimization data.
     """
@@ -4905,7 +5001,9 @@ async def generate_simulated_portfolio_optimization(request_body: Dict[str, Any]
     }
 
 
-async def generate_simulated_category_correlations(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_category_correlations(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated category correlations data.
     """
@@ -4923,7 +5021,9 @@ async def generate_simulated_category_correlations(request_body: Dict[str, Any])
     }
 
 
-async def generate_simulated_store_clustering(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_store_clustering(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated store clustering data.
     """
@@ -4954,7 +5054,9 @@ async def generate_simulated_store_clustering(request_body: Dict[str, Any]): # A
     }
 
 
-async def generate_simulated_performance_ranking(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_performance_ranking(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated performance ranking data.
     """
@@ -4973,7 +5075,9 @@ async def generate_simulated_performance_ranking(request_body: Dict[str, Any]): 
     }
 
 
-async def generate_simulated_best_practices(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_best_practices(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated best practices.
     """
@@ -5006,7 +5110,9 @@ async def generate_simulated_best_practices(request_body: Dict[str, Any]): # Add
     }
 
 
-async def generate_simulated_anomaly_detection(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_anomaly_detection(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated anomaly detection data.
     """
@@ -5024,7 +5130,9 @@ async def generate_simulated_anomaly_detection(request_body: Dict[str, Any]): # 
     }
 
 
-async def generate_simulated_cross_product_effects(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_cross_product_effects(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated cross-product effects data.
     """
@@ -5042,7 +5150,9 @@ async def generate_simulated_cross_product_effects(request_body: Dict[str, Any])
     }
 
 
-async def generate_simulated_optimal_pricing(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_optimal_pricing(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated optimal pricing data.
     """
@@ -5060,7 +5170,9 @@ async def generate_simulated_optimal_pricing(request_body: Dict[str, Any]): # Ad
     }
 
 
-async def generate_simulated_roi_optimization(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_roi_optimization(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated ROI optimization data.
     """
@@ -5078,7 +5190,9 @@ async def generate_simulated_roi_optimization(request_body: Dict[str, Any]): # A
     }
 
 
-async def generate_simulated_cross_store_optimization(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_cross_store_optimization(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated cross-store optimization data.
     """
@@ -5099,7 +5213,9 @@ async def generate_simulated_cross_store_optimization(request_body: Dict[str, An
     }
 
 
-async def generate_simulated_safety_stock(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_safety_stock(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated safety stock data.
     """
@@ -5118,7 +5234,9 @@ async def generate_simulated_safety_stock(request_body: Dict[str, Any]): # Add r
     }
 
 
-async def generate_simulated_reorder_optimization(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_reorder_optimization(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated reorder optimization data.
     """
@@ -5136,7 +5254,9 @@ async def generate_simulated_reorder_optimization(request_body: Dict[str, Any]):
     }
 
 
-async def generate_simulated_confidence_intervals(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_confidence_intervals(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated confidence intervals data.
     """
@@ -5172,7 +5292,9 @@ async def generate_simulated_confidence_intervals(request_body: Dict[str, Any]):
     }
 
 
-async def generate_simulated_live_alerts(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_live_alerts(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated live alerts data.
     """
@@ -5197,14 +5319,18 @@ async def generate_simulated_live_alerts(request_body: Dict[str, Any]): # Add re
 
     # Filter by severity if provided
     if severity_val and severity_val != "all":
-        filtered_alerts = [alert for alert in base_alerts if alert["severity"] == severity_val]
+        filtered_alerts = [
+            alert for alert in base_alerts if alert["severity"] == severity_val
+        ]
     else:
         filtered_alerts = base_alerts
 
-    return filtered_alerts[: 1 + (store_id_val % 2)] # Return 1 or 2 alerts
+    return filtered_alerts[: 1 + (store_id_val % 2)]  # Return 1 or 2 alerts
 
 
-async def generate_simulated_demand_monitoring(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_demand_monitoring(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated demand monitoring data.
     """
@@ -5223,7 +5349,9 @@ async def generate_simulated_demand_monitoring(request_body: Dict[str, Any]): # 
     }
 
 
-async def generate_simulated_competitive_intelligence(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_competitive_intelligence(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated competitive intelligence data.
     """
@@ -5245,7 +5373,9 @@ async def generate_simulated_competitive_intelligence(request_body: Dict[str, An
     }
 
 
-async def generate_simulated_customer_behavior(request_body: Dict[str, Any]): # Add request_body
+async def generate_simulated_customer_behavior(
+    request_body: Dict[str, Any]
+):  # Add request_body
     """
     Generate simulated customer behavior data.
     """

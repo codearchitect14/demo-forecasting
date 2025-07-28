@@ -20,11 +20,13 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+
 class ForecastModelManager:
     """
     Manages the loading and access of forecasting models (RandomForestRegressor, StandardScaler)
     Ensures models are loaded once and reused across requests.
     """
+
     def __init__(self):
         self.demand_model: Optional[RandomForestRegressor] = None
         self.demand_scaler: Optional[StandardScaler] = None
@@ -33,7 +35,7 @@ class ForecastModelManager:
 
     async def load_models(self):
         """
-        Placeholder for actual model loading logic. 
+        Placeholder for actual model loading logic.
         In a real scenario, models would be loaded from disk (e.g., .joblib files)
         or a model registry here.
         For this exercise, we'll initialize them with dummy data if not present
@@ -148,7 +150,7 @@ class DemandForecastResponse(BaseModel):
 
 
 @router.post("/demand-forecast")
-@cached(ttl=300) # Cache for 5 minutes
+@cached(ttl=300)  # Cache for 5 minutes
 async def demand_forecast(request_body: dict, request: Request):
     """
     Generate demand forecasts with inventory management insights
@@ -191,7 +193,9 @@ async def demand_forecast(request_body: dict, request: Request):
 
             # --- WebSocket Notification ---
             try:
-                websocket_manager = getattr(request.app.state, 'websocket_manager', None)
+                websocket_manager = getattr(
+                    request.app.state, "websocket_manager", None
+                )
                 if websocket_manager:
                     # Compose a useful demand/stockout notification
                     if demand_insights:
@@ -832,14 +836,14 @@ async def generate_demand_forecast_single(
         model = model_manager.demand_model
         scaler = model_manager.demand_scaler
 
-        if model is None or scaler is None: # Fallback if models failed to load
+        if model is None or scaler is None:  # Fallback if models failed to load
             logger.warning("Demand models not loaded, generating fallback forecast.")
             return generate_fallback_demand_forecast(forecast_days)
 
         X = features.drop(["estimated_units_sold"], axis=1)
         y = features["estimated_units_sold"]
 
-        # Fit scaler and model only if new data requires re-training, 
+        # Fit scaler and model only if new data requires re-training,
         # or if it's the first time and model needs a fit for prediction
         # In a real system, you'd load pre-trained models.
         X_scaled = scaler.fit_transform(X)
@@ -1373,24 +1377,29 @@ def generate_inventory_recommendations(
         # --- NEW: Supplier management per product/store with high lead time or frequent stockouts ---
         # For demo, assume high lead time if days_until_stockout < 7 and stockout_frequency > 0.3
         supplier_issues = [
-            item for item in inventory_status if (getattr(item, 'supplier_lead_time', 0) and item.supplier_lead_time > 7) or item.stockout_frequency > 0.3
+            item
+            for item in inventory_status
+            if (getattr(item, "supplier_lead_time", 0) and item.supplier_lead_time > 7)
+            or item.stockout_frequency > 0.3
         ]
         for item in supplier_issues:
-            recommendations.append({
-                "type": "supplier_management",
-                "priority": "medium",
-                "title": f"Supplier Optimization for {item.product_name} ({item.store_name})",
-                "description": f"Improve supplier performance for {item.product_name} in {item.store_name} (lead time: {getattr(item, 'supplier_lead_time', 'N/A')} days, stockout freq: {item.stockout_frequency:.2f})",
-                "action_items": [
-                    f"Negotiate shorter lead times for {item.product_name}",
-                    f"Establish backup suppliers for {item.product_name} in {item.store_name}",
-                    f"Implement vendor-managed inventory for {item.product_name}",
-                    f"Monitor supplier performance for {item.product_name}"
-                ],
-                "estimated_impact": int(item.avg_daily_demand * 30 * 2),
-                "affected_products": [item.product_name],
-                "affected_stores": [item.store_name],
-            })
+            recommendations.append(
+                {
+                    "type": "supplier_management",
+                    "priority": "medium",
+                    "title": f"Supplier Optimization for {item.product_name} ({item.store_name})",
+                    "description": f"Improve supplier performance for {item.product_name} in {item.store_name} (lead time: {getattr(item, 'supplier_lead_time', 'N/A')} days, stockout freq: {item.stockout_frequency:.2f})",
+                    "action_items": [
+                        f"Negotiate shorter lead times for {item.product_name}",
+                        f"Establish backup suppliers for {item.product_name} in {item.store_name}",
+                        f"Implement vendor-managed inventory for {item.product_name}",
+                        f"Monitor supplier performance for {item.product_name}",
+                    ],
+                    "estimated_impact": int(item.avg_daily_demand * 30 * 2),
+                    "affected_products": [item.product_name],
+                    "affected_stores": [item.store_name],
+                }
+            )
 
         # Demand forecasting improvements
         recommendations.append(
@@ -1427,7 +1436,9 @@ def generate_inventory_recommendations(
                 "estimated_impact": sum(
                     item.recommended_reorder_quantity * 2 for item in inventory_status
                 ),
-                "affected_products": list({item.product_name for item in inventory_status}),
+                "affected_products": list(
+                    {item.product_name for item in inventory_status}
+                ),
                 "affected_stores": list({item.store_name for item in inventory_status}),
             }
         )
@@ -1576,8 +1587,10 @@ async def get_diverse_store_selection(
 @router.post(
     "/multi-dimensional-forecast", response_model=MultiDimensionalForecastResponse
 )
-@cached(ttl=300) # Cache for 5 minutes
-async def multi_dimensional_forecast(request_body: MultiDimensionalForecastRequest, request: Request):
+@cached(ttl=300)  # Cache for 5 minutes
+async def multi_dimensional_forecast(
+    request_body: MultiDimensionalForecastRequest, request: Request
+):
     """
     Generate multi-dimensional forecasts with comparative analysis and insights
     """
@@ -1623,13 +1636,15 @@ async def multi_dimensional_forecast(request_body: MultiDimensionalForecastReque
 
             # --- WebSocket Notification ---
             try:
-                websocket_manager = getattr(request.app.state, 'websocket_manager', None)
+                websocket_manager = getattr(
+                    request.app.state, "websocket_manager", None
+                )
                 if websocket_manager:
                     # Compose a useful sales forecast notification
                     if insights:
                         top_insight = insights[0]
                         msg = f"Insight for Sales Forecast: {top_insight.product_name} in {top_insight.location} ({top_insight.store_name}): {top_insight.recommendation} (Growth: {top_insight.growth_rate:.1f}%, Confidence: {top_insight.confidence_score:.1f}%)"
-                    elif summary and summary.get('total_combinations', 0) > 0:
+                    elif summary and summary.get("total_combinations", 0) > 0:
                         msg = f"Sales Forecast: {summary['total_combinations']} combinations analyzed."
                     else:
                         msg = "Sales Forecast: No insights available."
@@ -1797,7 +1812,7 @@ async def generate_single_forecast(
         model = model_manager.sales_model
         scaler = model_manager.sales_scaler
 
-        if model is None or scaler is None: # Fallback if models failed to load
+        if model is None or scaler is None:  # Fallback if models failed to load
             logger.warning("Sales models not loaded, generating fallback forecast.")
             return generate_fallback_forecast(forecast_days)
 
@@ -2465,12 +2480,12 @@ def generate_forecast_summary(
 
 
 @router.get("/weather-holiday-data")
-async def get_weather_holiday_data(request: Request): # Accept Request object
+async def get_weather_holiday_data(request: Request):  # Accept Request object
     """
     Explore weather and holiday data patterns in the database
     """
     try:
-        manager = request.app.state.db_manager # Access from app.state
+        manager = request.app.state.db_manager  # Access from app.state
         if not manager.pool:
             raise RuntimeError("Database pool not initialized. Check startup events.")
         async with manager.get_connection() as conn:
@@ -2639,7 +2654,7 @@ async def weather_api_status():
 
 
 @router.post("/weather-holiday-forecast")
-@cached(ttl=300) # Cache for 5 minutes
+@cached(ttl=300)  # Cache for 5 minutes
 async def weather_holiday_forecast(request_body: dict, request: Request):
     """
     Advanced weather and holiday-based forecasting with real-time recommendations
@@ -2686,7 +2701,9 @@ async def weather_holiday_forecast(request_body: dict, request: Request):
 
             # --- WebSocket Notification ---
             try:
-                websocket_manager = getattr(request.app.state, 'websocket_manager', None)
+                websocket_manager = getattr(
+                    request.app.state, "websocket_manager", None
+                )
                 if websocket_manager:
                     # Compose a useful weather/promotional notification
                     if promotional_analysis:

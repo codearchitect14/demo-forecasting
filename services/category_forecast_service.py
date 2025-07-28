@@ -11,10 +11,11 @@ import logging
 import asyncio
 from pathlib import Path
 import json
-from fastapi import Request # Import Request
+from fastapi import Request  # Import Request
 
 # Import custom modules
 from models.category_forecaster import CategoryLevelForecaster
+
 # from database.connection import get_pool, cached, paginate # Removed
 from services.data_preprocessor import DataPreprocessor
 
@@ -58,7 +59,7 @@ class CategoryForecastService:
     # @cached("category_sales_data") # Removed, caching will be handled via DatabaseManager.execute_cached_query
     async def fetch_category_sales_data(
         self,
-        request: Request, # Add request
+        request: Request,  # Add request
         category_id: Optional[int] = None,
         store_id: Optional[int] = None,
         city_id: Optional[int] = None,
@@ -84,7 +85,7 @@ class CategoryForecastService:
         Returns:
             List of dictionaries with sales data
         """
-        manager = request.app.state.db_manager # Access db_manager
+        manager = request.app.state.db_manager  # Access db_manager
 
         # Base query for product-level data
         query = """
@@ -156,13 +157,13 @@ class CategoryForecastService:
             query += f" OFFSET ${param_count}"
             params.append(offset)
 
-        async with manager.get_connection() as connection: # Use manager's connection
+        async with manager.get_connection() as connection:  # Use manager's connection
             rows = await connection.fetch(query, *params)
             return [dict(row) for row in rows]
 
     async def aggregate_category_data(
         self,
-        request: Request, # Add request
+        request: Request,  # Add request
         category_id: Optional[int] = None,
         store_id: Optional[int] = None,
         city_id: Optional[int] = None,
@@ -186,7 +187,7 @@ class CategoryForecastService:
         """
         # Fetch product-level data
         data = await self.fetch_category_sales_data(
-            request, # Pass request
+            request,  # Pass request
             category_id=category_id,
             store_id=store_id,
             city_id=city_id,
@@ -217,7 +218,7 @@ class CategoryForecastService:
     # @cached("category_seasonality") # Removed, caching will be handled via DatabaseManager.execute_cached_query
     async def analyze_category_seasonality(
         self,
-        request: Request, # Add request
+        request: Request,  # Add request
         category_id: Optional[int] = None,
         store_id: Optional[int] = None,
         city_id: Optional[int] = None,
@@ -244,7 +245,7 @@ class CategoryForecastService:
         try:
             # Get aggregated data
             category_df = await self.aggregate_category_data(
-                request, # Pass request
+                request,  # Pass request
                 category_id=category_id,
                 store_id=store_id,
                 city_id=city_id,
@@ -312,7 +313,7 @@ class CategoryForecastService:
 
     async def train_category_model(
         self,
-        request: Request, # Add request
+        request: Request,  # Add request
         aggregation_level: str = "category",
         model_type: str = "gradient_boost",
         category_id: Optional[int] = None,
@@ -343,7 +344,7 @@ class CategoryForecastService:
         try:
             # Get aggregated training data
             category_df = await self.aggregate_category_data(
-                request, # Pass request
+                request,  # Pass request
                 category_id=category_id,
                 store_id=store_id,
                 city_id=city_id,
@@ -394,7 +395,7 @@ class CategoryForecastService:
 
     async def forecast_category_demand(
         self,
-        request: Request, # Add request
+        request: Request,  # Add request
         categories: List[int],
         stores: List[int],
         start_date: str,
@@ -515,7 +516,7 @@ class CategoryForecastService:
 
     async def analyze_category_performance(
         self,
-        request: Request, # Add request
+        request: Request,  # Add request
         category_id: Optional[int] = None,
         store_id: Optional[int] = None,
         city_id: Optional[int] = None,
@@ -542,7 +543,7 @@ class CategoryForecastService:
         try:
             # Get aggregated data
             category_df = await self.aggregate_category_data(
-                request, # Pass request
+                request,  # Pass request
                 category_id=category_id,
                 store_id=store_id,
                 city_id=city_id,
@@ -707,7 +708,7 @@ class CategoryForecastService:
     # @paginate() # Removed, pagination will be handled via DatabaseManager.execute_dataframe_query
     async def get_category_hierarchies(
         self,
-        request: Request, # Add request
+        request: Request,  # Add request
         limit: Optional[int] = None,
         offset: Optional[int] = None,
     ) -> List[Dict[str, Any]]:
@@ -721,7 +722,7 @@ class CategoryForecastService:
         Returns:
             Category hierarchy data
         """
-        manager = request.app.state.db_manager # Access db_manager
+        manager = request.app.state.db_manager  # Access db_manager
 
         query = """
         SELECT 
@@ -747,6 +748,6 @@ class CategoryForecastService:
             query += f" OFFSET ${len(params) + 1}"
             params.append(offset)
 
-        async with manager.get_connection() as connection: # Use manager's connection
+        async with manager.get_connection() as connection:  # Use manager's connection
             rows = await connection.fetch(query, *params)
             return [dict(row) for row in rows]

@@ -18,7 +18,7 @@ import os
 from dotenv import load_dotenv
 from .config import get_db_config
 import hashlib
-from fastapi import Request # Import Request for type hinting in decorator
+from fastapi import Request  # Import Request for type hinting in decorator
 
 # Load environment variables
 load_dotenv()
@@ -42,7 +42,9 @@ class DatabaseManager:
         self.query_cache: Dict[str, Any] = {}
         self.cache_ttl: int = 300  # 5 minutes default TTL
         self.max_cache_size: int = 1000
-        logger.debug(f"DatabaseManager initialized. query_cache ID: {id(self.query_cache)}")
+        logger.debug(
+            f"DatabaseManager initialized. query_cache ID: {id(self.query_cache)}"
+        )
 
         # Database configuration
         self.db_config = get_db_config()
@@ -92,7 +94,9 @@ class DatabaseManager:
         # Convert any list within params to tuple to make it hashable
         hashable_params = tuple(tuple(p) if isinstance(p, list) else p for p in params)
         key = f"{hash(query)}_{hash(hashable_params)}"
-        logger.debug(f"Generated cache key for query: {query[:50]}... with params: {params} -> {key}")
+        logger.debug(
+            f"Generated cache key for query: {query[:50]}... with params: {params} -> {key}"
+        )
         return key
 
     def is_cache_valid(self, timestamp: float) -> bool:
@@ -352,7 +356,9 @@ class DatabaseManager:
         param_count = 3
 
         if store_id:
-            query += " AND (pc.store_id = $" + str(param_count) + " OR pc.store_id IS NULL)"
+            query += (
+                " AND (pc.store_id = $" + str(param_count) + " OR pc.store_id IS NULL)"
+            )
             params.append(store_id)
             param_count += 1
 
@@ -727,22 +733,32 @@ class DatabaseManager:
         self.query_cache.clear()
         logger.info("Query cache cleared")
 
-    async def execute_insert(self, table_name: str, data: Dict[str, Any]) -> Dict[str, Any]:
+    async def execute_insert(
+        self, table_name: str, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
         """Executes an INSERT query and returns the inserted row."""
         columns = ", ".join(data.keys())
         placeholders = ", ".join(f"${i+1}" for i in range(len(data)))
-        query = f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders}) RETURNING *"
+        query = (
+            f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders}) RETURNING *"
+        )
         values = list(data.values())
 
         async with self.get_connection() as conn:
             result = await conn.fetchrow(query, *values)
             return dict(result) if result else {}
 
-    async def execute_update(self, table_name: str, data: Dict[str, Any], conditions: Dict[str, Any]) -> List[Dict[str, Any]]:
+    async def execute_update(
+        self, table_name: str, data: Dict[str, Any], conditions: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
         """Executes an UPDATE query and returns the updated rows."""
         set_clauses = ", ".join(f"{col} = ${i+1}" for i, col in enumerate(data.keys()))
-        where_clauses = " AND ".join(f"{col} = ${i+len(data)+1}" for i, col in enumerate(conditions.keys()))
-        query = f"UPDATE {table_name} SET {set_clauses} WHERE {where_clauses} RETURNING *"
+        where_clauses = " AND ".join(
+            f"{col} = ${i+len(data)+1}" for i, col in enumerate(conditions.keys())
+        )
+        query = (
+            f"UPDATE {table_name} SET {set_clauses} WHERE {where_clauses} RETURNING *"
+        )
         values = list(data.values()) + list(conditions.values())
 
         async with self.get_connection() as conn:
@@ -751,14 +767,17 @@ class DatabaseManager:
 
     async def execute_delete(self, table_name: str, conditions: Dict[str, Any]) -> int:
         """Executes a DELETE query and returns the number of deleted rows."""
-        where_clauses = " AND ".join(f"{col} = ${i+1}" for i, col in enumerate(conditions.keys()))
+        where_clauses = " AND ".join(
+            f"{col} = ${i+1}" for i, col in enumerate(conditions.keys())
+        )
         query = f"DELETE FROM {table_name} WHERE {where_clauses}"
         values = list(conditions.values())
 
         async with self.get_connection() as conn:
             status = await conn.execute(query, *values)
             # The status string is typically 'DELETE N' where N is the number of rows.
-            return int(status.split(' ')[1]) if ' ' in status else 0
+            return int(status.split(" ")[1]) if " " in status else 0
+
 
 # Remove global db_manager instance, it will be managed by app.state
 # _db_manager_instance: Optional[DatabaseManager] = None
@@ -810,23 +829,36 @@ def cached(ttl: int = 300):
                 if isinstance(arg, Request):
                     request = arg
                     break
-            if 'request' in kwargs and isinstance(kwargs['request'], Request):
-                request = kwargs['request']
-            
+            if "request" in kwargs and isinstance(kwargs["request"], Request):
+                request = kwargs["request"]
+
             # If request is None (e.g., during startup, internal calls), bypass caching and proceed
             if request is None:
-                logger.debug(f"Request object is None in @cached for {func.__name__}. Bypassing cache and directly executing function.")
+                logger.debug(
+                    f"Request object is None in @cached for {func.__name__}. Bypassing cache and directly executing function."
+                )
                 return await func(*args, **kwargs)
 
             # Now that we know request is not None, we can safely access its attributes
             # If it's not an HTTP request (e.g., ASGI lifespan, background task), bypass caching
-            if request.scope is None or not hasattr(request.scope, 'type') or request.scope['type'] != 'http':
-                logger.debug(f"Bypassing cache for non-HTTP request (scope type is not 'http') to {func.__name__}")
+            if (
+                request.scope is None
+                or not hasattr(request.scope, "type")
+                or request.scope["type"] != "http"
+            ):
+                logger.debug(
+                    f"Bypassing cache for non-HTTP request (scope type is not 'http') to {func.__name__}"
+                )
                 return await func(*args, **kwargs)
 
             # CRITICAL: Also bypass if db_manager is not yet available in app.state (e.g., during startup before app.on_event runs)
-            if not hasattr(request.app.state, 'db_manager') or request.app.state.db_manager is None:
-                logger.warning(f"db_manager not found or is None in app.state for {func.__name__}. Bypassing cache for this request.")
+            if (
+                not hasattr(request.app.state, "db_manager")
+                or request.app.state.db_manager is None
+            ):
+                logger.warning(
+                    f"db_manager not found or is None in app.state for {func.__name__}. Bypassing cache for this request."
+                )
                 return await func(*args, **kwargs)
 
             manager = request.app.state.db_manager
@@ -835,24 +867,28 @@ def cached(ttl: int = 300):
             def default_json_encoder(obj):
                 if isinstance(obj, datetime):
                     return obj.isoformat()
-                if hasattr(obj, 'model_dump'): # Pydantic v2
+                if hasattr(obj, "model_dump"):  # Pydantic v2
                     return obj.model_dump()
-                if hasattr(obj, 'dict'): # Pydantic v1
+                if hasattr(obj, "dict"):  # Pydantic v1
                     return obj.dict()
                 # Handle Request object by ignoring it in cache key generation
                 if isinstance(obj, Request):
-                    return "_REQUEST_OBJECT_" # Placeholder, will be consistent
+                    return "_REQUEST_OBJECT_"  # Placeholder, will be consistent
                 # Ensure consistent order for lists and dictionary keys for hashing
                 if isinstance(obj, list):
-                    return sorted(obj, key=lambda x: str(x)) # Sort list elements
+                    return sorted(obj, key=lambda x: str(x))  # Sort list elements
                 if isinstance(obj, dict):
-                    return {k: obj[k] for k in sorted(obj)} # Sort dictionary keys
-                raise TypeError(f"Object of type {obj.__class__.__name__} is not JSON serializable")
+                    return {k: obj[k] for k in sorted(obj)}  # Sort dictionary keys
+                raise TypeError(
+                    f"Object of type {obj.__class__.__name__} is not JSON serializable"
+                )
 
             try:
                 # Filter out the Request object from args/kwargs for caching purposes
                 filtered_args = [arg for arg in args if not isinstance(arg, Request)]
-                filtered_kwargs = {k: v for k, v in kwargs.items() if not isinstance(v, Request)}
+                filtered_kwargs = {
+                    k: v for k, v in kwargs.items() if not isinstance(v, Request)
+                }
 
                 # Recursively sort lists and dictionary keys within filtered_args and filtered_kwargs
                 def deep_sort(item):
@@ -863,39 +899,52 @@ def cached(ttl: int = 300):
                         try:
                             return sorted(item, key=lambda x: str(deep_sort(x)))
                         except TypeError:
-                            return item # Cannot sort, return as is
+                            return item  # Cannot sort, return as is
                     return item
-                
+
                 cache_input = {
-                    'args': deep_sort(filtered_args),
-                    'kwargs': deep_sort(filtered_kwargs)
+                    "args": deep_sort(filtered_args),
+                    "kwargs": deep_sort(filtered_kwargs),
                 }
 
-                cache_key_str = json.dumps(cache_input, sort_keys=True, default=default_json_encoder)
+                cache_key_str = json.dumps(
+                    cache_input, sort_keys=True, default=default_json_encoder
+                )
                 logger.debug(f"Generated raw cache key string: {cache_key_str}")
                 # Use SHA256 for consistent hashing across runs
                 cache_key = f"{func.__name__}_{hashlib.sha256(cache_key_str.encode()).hexdigest()}"
             except TypeError as e:
-                logger.warning(f"Could not serialize function arguments for caching: {e}. Falling back to basic hashing.")
+                logger.warning(
+                    f"Could not serialize function arguments for caching: {e}. Falling back to basic hashing."
+                )
                 # Fallback remains, though should be rarely hit now
                 cache_key = f"{func.__name__}_{hash(str(args) + str(kwargs))}"
 
-            logger.debug(f"Generated function cache key for {func.__name__} with args: {args}, kwargs: {kwargs} -> {cache_key}")
-            logger.debug(f"Current query_cache size: {len(manager.query_cache)}. query_cache ID: {id(manager.query_cache)}")
+            logger.debug(
+                f"Generated function cache key for {func.__name__} with args: {args}, kwargs: {kwargs} -> {cache_key}"
+            )
+            logger.debug(
+                f"Current query_cache size: {len(manager.query_cache)}. query_cache ID: {id(manager.query_cache)}"
+            )
 
-            if (
-                hasattr(manager, "query_cache")
-                and cache_key in manager.query_cache
-            ):
+            if hasattr(manager, "query_cache") and cache_key in manager.query_cache:
                 cached_result, timestamp = manager.query_cache[cache_key]
                 if (time.time() - timestamp) < ttl:
-                    logger.info(f"Cache hit for function {func.__name__} with key: {cache_key}")
+                    logger.info(
+                        f"Cache hit for function {func.__name__} with key: {cache_key}"
+                    )
                     return cached_result
                 else:
-                    logger.info(f"Cache expired for function {func.__name__}. Cache miss with key: {cache_key}")
-                    logger.debug(f"Cache content for expired key: {manager.query_cache.get(cache_key)}")
+                    logger.info(
+                        f"Cache expired for function {func.__name__}. Cache miss with key: {cache_key}"
+                    )
+                    logger.debug(
+                        f"Cache content for expired key: {manager.query_cache.get(cache_key)}"
+                    )
             else:
-                logger.info(f"Cache miss for function {func.__name__} with key: {cache_key}")
+                logger.info(
+                    f"Cache miss for function {func.__name__} with key: {cache_key}"
+                )
 
             result = await func(*args, **kwargs)
             if hasattr(manager, "query_cache"):
@@ -903,12 +952,16 @@ def cached(ttl: int = 300):
                 if len(manager.query_cache) >= manager.max_cache_size:
                     oldest_key = min(
                         manager.query_cache.keys(),
-                        key=lambda k: manager.query_cache[k][1]
+                        key=lambda k: manager.query_cache[k][1],
                     )
-                    logger.debug(f"Cache max size reached. Removing oldest entry: {oldest_key}")
+                    logger.debug(
+                        f"Cache max size reached. Removing oldest entry: {oldest_key}"
+                    )
                     del manager.query_cache[oldest_key]
                 manager.query_cache[cache_key] = (result, time.time())
-                logger.debug(f"Added to cache. New cache size: {len(manager.query_cache)}")
+                logger.debug(
+                    f"Added to cache. New cache size: {len(manager.query_cache)}"
+                )
             return result
 
         return wrapper

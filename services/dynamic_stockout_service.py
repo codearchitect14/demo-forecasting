@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from fastapi import Request
+
 # from database.connection import get_pool # Removed
 
 logger = logging.getLogger(__name__)
@@ -23,14 +24,14 @@ class DynamicStockoutService:
 
     async def get_stockout_data(
         self,
-        request: Request, # Add request
+        request: Request,  # Add request
         store_id: Optional[int] = None,
         product_id: Optional[int] = None,
         limit: int = 1000,
     ) -> pd.DataFrame:
         """Fetch actual sales and stock data from database."""
 
-        manager = request.app.state.db_manager # Access db_manager
+        manager = request.app.state.db_manager  # Access db_manager
 
         query = """
         SELECT 
@@ -63,7 +64,7 @@ class DynamicStockoutService:
         query += f" ORDER BY sd.dt DESC LIMIT ${len(params) + 1}"
         params.append(limit)
 
-        async with manager.get_connection() as connection: # Use manager's connection
+        async with manager.get_connection() as connection:  # Use manager's connection
             rows = await connection.fetch(query, *params)
 
         if not rows:
@@ -74,7 +75,10 @@ class DynamicStockoutService:
         return df
 
     async def analyze_stockout_risk(
-        self, request: Request, store_id: Optional[int] = None, product_id: Optional[int] = None
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        product_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Analyze real stockout risk from database data."""
 
@@ -149,7 +153,12 @@ class DynamicStockoutService:
             return self._generate_simulated_cross_store_optimization()
 
     async def calculate_dynamic_safety_stock(
-        self, request: Request, store_id: int, product_id: int, city_id: int = 0, service_level: int = 95
+        self,
+        request: Request,
+        store_id: int,
+        product_id: int,
+        city_id: int = 0,
+        service_level: int = 95,
     ) -> Dict[str, Any]:
         """Calculate dynamic safety stock levels."""
         try:

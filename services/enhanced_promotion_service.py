@@ -15,7 +15,7 @@ import json
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 import warnings
-from fastapi import Request # Import Request
+from fastapi import Request  # Import Request
 
 warnings.filterwarnings("ignore")
 
@@ -65,7 +65,7 @@ class EnhancedPromotionService:
         self.scaler = StandardScaler()
 
     async def analyze_promotion_impact(
-        self, request_data: PromotionAnalysisRequest, request: Request # Add request
+        self, request_data: PromotionAnalysisRequest, request: Request  # Add request
     ) -> PromotionAnalysisResult:
         """Comprehensive promotion impact analysis"""
 
@@ -74,7 +74,9 @@ class EnhancedPromotionService:
         )
 
         # Get historical data
-        historical_data = await self._get_promotion_sales_data(request_data, request) # Pass request
+        historical_data = await self._get_promotion_sales_data(
+            request_data, request
+        )  # Pass request
 
         if historical_data.empty:
             raise ValueError("No historical data available")
@@ -88,7 +90,7 @@ class EnhancedPromotionService:
         cross_effects = None
         if request_data.include_cross_product_effects:
             cross_effects = await self._analyze_cross_product_effects(
-                historical_data, request_data, request # Pass request
+                historical_data, request_data, request  # Pass request
             )
 
         # Cannibalization analysis
@@ -119,7 +121,7 @@ class EnhancedPromotionService:
         )
 
     async def _get_promotion_sales_data(
-        self, request_data: PromotionAnalysisRequest, request: Request # Add request
+        self, request_data: PromotionAnalysisRequest, request: Request  # Add request
     ) -> pd.DataFrame:
         """Get sales data with promotion information"""
 
@@ -129,7 +131,7 @@ class EnhancedPromotionService:
         # Access db_manager from app.state
         manager = request.app.state.db_manager
 
-        sales_data = await manager.get_sales_data( # Use manager.get_sales_data
+        sales_data = await manager.get_sales_data(  # Use manager.get_sales_data
             store_ids=request_data.store_ids,
             product_ids=request_data.product_ids,
             start_date=start_date,
@@ -140,13 +142,13 @@ class EnhancedPromotionService:
         sales_data["is_promoted"] = (sales_data["discount"] < 1.0).astype(int)
         sales_data["discount_percentage"] = (1 - sales_data["discount"]) * 100
         sales_data["promotion_depth"] = np.where(
-            sales_data["discount_percentage"].notna(), # Check for non-NaN values
+            sales_data["discount_percentage"].notna(),  # Check for non-NaN values
             pd.cut(
                 sales_data["discount_percentage"],
                 bins=[0, 10, 20, 30, 50, 100],
                 labels=["light", "moderate", "deep", "very_deep", "extreme"],
-                right=False, # Make bins inclusive on the left
-                include_lowest=True
+                right=False,  # Make bins inclusive on the left
+                include_lowest=True,
             ),
             "none",
         )
@@ -240,7 +242,10 @@ class EnhancedPromotionService:
         return effectiveness
 
     async def _analyze_cross_product_effects(
-        self, data: pd.DataFrame, request_data: PromotionAnalysisRequest, request: Request # Add request
+        self,
+        data: pd.DataFrame,
+        request_data: PromotionAnalysisRequest,
+        request: Request,  # Add request
     ) -> Dict[str, Any]:
         """Analyze cross-product promotion effects"""
 
@@ -250,7 +255,7 @@ class EnhancedPromotionService:
         manager = request.app.state.db_manager
 
         # Get product correlations for cross-selling analysis
-        correlations = await manager.calculate_product_correlations( # Use manager.calculate_product_correlations
+        correlations = await manager.calculate_product_correlations(  # Use manager.calculate_product_correlations
             analysis_period_days=request_data.analysis_period_days
         )
 
@@ -258,7 +263,7 @@ class EnhancedPromotionService:
             product_effects = {}
 
             # Find correlated products
-            product_correlations = await manager.get_product_correlations( # Use manager.get_product_correlations
+            product_correlations = await manager.get_product_correlations(  # Use manager.get_product_correlations
                 product_id=product_id, correlation_threshold=0.3
             )
 

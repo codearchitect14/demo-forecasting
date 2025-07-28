@@ -6,7 +6,13 @@ from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Union, Any
 import pandas as pd
 import numpy as np
-from fastapi import FastAPI, APIRouter, HTTPException, Depends, Request # Import Request
+from fastapi import (
+    FastAPI,
+    APIRouter,
+    HTTPException,
+    Depends,
+    Request,
+)  # Import Request
 from pydantic import BaseModel, Field
 import logging
 import os
@@ -15,7 +21,11 @@ import sys
 # Add project root to Python path
 sys.path.append(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 from models.promo_uplift_model import PromoUpliftModel
-from api.forecast import get_promo_model, fetch_historical_data, fetch_promotion_data # Import fetch_promotion_data
+from api.forecast import (
+    get_promo_model,
+    fetch_historical_data,
+    fetch_promotion_data,
+)  # Import fetch_promotion_data
 
 # Configure logging
 logging.basicConfig(
@@ -93,7 +103,9 @@ class PromotionRecommendationResponse(BaseModel):
 
 
 @router.post("/", response_model=PromotionResponse)
-async def create_promotion(promotion: PromotionCreate, request: Request): # Make async, add Request
+async def create_promotion(
+    promotion: PromotionCreate, request: Request
+):  # Make async, add Request
     """
     Create a new promotion.
 
@@ -111,7 +123,7 @@ async def create_promotion(promotion: PromotionCreate, request: Request): # Make
     - Created promotion with ID and timestamp
     """
     try:
-        manager = request.app.state.db_manager # Access from app.state
+        manager = request.app.state.db_manager  # Access from app.state
 
         # Parse dates to ensure proper format
         start_date = pd.to_datetime(promotion.start_date).strftime("%Y-%m-%d")
@@ -146,7 +158,9 @@ async def create_promotion(promotion: PromotionCreate, request: Request): # Make
 
 
 @router.put("/{promotion_id}", response_model=PromotionResponse)
-async def update_promotion(promotion_id: int, promotion: PromotionUpdate, request: Request): # Make async, add Request
+async def update_promotion(
+    promotion_id: int, promotion: PromotionUpdate, request: Request
+):  # Make async, add Request
     """
     Update an existing promotion.
 
@@ -158,7 +172,7 @@ async def update_promotion(promotion_id: int, promotion: PromotionUpdate, reques
     - Updated promotion
     """
     try:
-        manager = request.app.state.db_manager # Access from app.state
+        manager = request.app.state.db_manager  # Access from app.state
 
         # Build update data - only include fields that are not None
         update_data = {}
@@ -194,7 +208,9 @@ async def update_promotion(promotion_id: int, promotion: PromotionUpdate, reques
         if updated_promos:
             return PromotionResponse(**updated_promos[0])
         else:
-            raise HTTPException(status_code=404, detail="Promotion not found or failed to update")
+            raise HTTPException(
+                status_code=404, detail="Promotion not found or failed to update"
+            )
 
     except Exception as e:
         logger.error(f"Error updating promotion: {str(e)}")
@@ -204,7 +220,9 @@ async def update_promotion(promotion_id: int, promotion: PromotionUpdate, reques
 
 
 @router.delete("/{promotion_id}")
-async def delete_promotion(promotion_id: int, request: Request): # Make async, add Request
+async def delete_promotion(
+    promotion_id: int, request: Request
+):  # Make async, add Request
     """
     Delete an existing promotion.
 
@@ -215,15 +233,19 @@ async def delete_promotion(promotion_id: int, request: Request): # Make async, a
     - Success message
     """
     try:
-        manager = request.app.state.db_manager # Access from app.state
+        manager = request.app.state.db_manager  # Access from app.state
 
         # Delete from database using the new helper method
-        deleted_count = await manager.execute_delete("promotion_events", {"id": promotion_id})
+        deleted_count = await manager.execute_delete(
+            "promotion_events", {"id": promotion_id}
+        )
 
         if deleted_count > 0:
             return {"message": f"Promotion with ID {promotion_id} deleted successfully"}
         else:
-            raise HTTPException(status_code=404, detail=f"Promotion with ID {promotion_id} not found")
+            raise HTTPException(
+                status_code=404, detail=f"Promotion with ID {promotion_id} not found"
+            )
 
     except Exception as e:
         logger.error(f"Error deleting promotion: {str(e)}")
@@ -233,8 +255,8 @@ async def delete_promotion(promotion_id: int, request: Request): # Make async, a
 
 
 @router.get("/", response_model=List[PromotionResponse])
-async def list_promotions( # Make async
-    request: Request, # Add Request object
+async def list_promotions(  # Make async
+    request: Request,  # Add Request object
     store_id: Optional[int] = None,
     product_id: Optional[int] = None,
     category_id: Optional[int] = None,
@@ -257,7 +279,7 @@ async def list_promotions( # Make async
     - List of matching promotions
     """
     try:
-        manager = request.app.state.db_manager # Access from app.state
+        manager = request.app.state.db_manager  # Access from app.state
 
         # Base query
         query = """
@@ -283,7 +305,7 @@ async def list_promotions( # Make async
 
         # Where clause
         filters = []
-        params = [] # Use list for asyncpg params
+        params = []  # Use list for asyncpg params
         param_count = 1
 
         if store_id is not None:
@@ -313,7 +335,9 @@ async def list_promotions( # Make async
 
         if active is not None and active:
             today = datetime.now().strftime("%Y-%m-%d")
-            filters.append(f"pe.start_date <= ${{{param_count}}} AND pe.end_date >= ${{{param_count + 1}}}")
+            filters.append(
+                f"pe.start_date <= ${{{param_count}}} AND pe.end_date >= ${{{param_count + 1}}}"
+            )
             params.append(today)
             params.append(today)
             param_count += 2
@@ -335,8 +359,10 @@ async def list_promotions( # Make async
                 id=row["id"],
                 store_id=row["store_id"],
                 product_id=row["product_id"],
-                start_date=row["start_date"].strftime("%Y-%m-%d"), # Ensure date is string
-                end_date=row["end_date"].strftime("%Y-%m-%d"),     # Ensure date is string
+                start_date=row["start_date"].strftime(
+                    "%Y-%m-%d"
+                ),  # Ensure date is string
+                end_date=row["end_date"].strftime("%Y-%m-%d"),  # Ensure date is string
                 promotion_type=row["promotion_type"],
                 discount_percentage=row["discount_percentage"],
                 display_location=row["display_location"],
@@ -356,8 +382,8 @@ async def list_promotions( # Make async
 
 @router.post("/recommend", response_model=PromotionRecommendationResponse)
 async def recommend_promotions(
-    request_body: PromotionRecommendationRequest, # Rename to request_body
-    fastapi_request: Request, # Add FastAPI Request object
+    request_body: PromotionRecommendationRequest,  # Rename to request_body
+    fastapi_request: Request,  # Add FastAPI Request object
     model: PromoUpliftModel = Depends(get_promo_model),
 ):
     """
@@ -390,7 +416,7 @@ async def recommend_promotions(
 
         # Get historical data
         df = await fetch_historical_data(
-            fastapi_request, # Pass FastAPI request
+            fastapi_request,  # Pass FastAPI request
             store_id=request_body.store_id,
             product_id=request_body.product_id,
             category_id=request_body.category_id,
@@ -492,7 +518,9 @@ async def recommend_promotions(
 
         # Sort by estimated ROI and take the top n
         recommendations.sort(key=lambda x: x["estimated_roi"], reverse=True)
-        top_recommendations = recommendations[: request_body.count] # Use request_body.count
+        top_recommendations = recommendations[
+            : request_body.count
+        ]  # Use request_body.count
 
         # If target uplift is specified, filter to meet target
         if request_body.target_uplift is not None:

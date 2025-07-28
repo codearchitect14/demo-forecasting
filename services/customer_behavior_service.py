@@ -15,7 +15,7 @@ from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 from sklearn.decomposition import PCA
 import json
-from fastapi import Request # Import Request
+from fastapi import Request  # Import Request
 
 # from database.connection import get_db_connection # Removed
 from utils.logger import get_logger
@@ -75,15 +75,26 @@ class CustomerBehaviorService:
         }
 
     async def analyze_customer_behavior(
-        self, request: Request, store_id: Optional[int] = None, city_id: Optional[int] = None # Add request
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        city_id: Optional[int] = None,  # Add request
     ) -> Dict[str, Any]:
         """Comprehensive customer behavior analysis."""
         try:
             # Run parallel analysis tasks
-            segmentation_task = self._perform_customer_segmentation(request, store_id, city_id) # Pass request
-            patterns_task = self._identify_shopping_patterns(request, store_id, city_id) # Pass request
-            lifecycle_task = self._analyze_customer_lifecycle(request, store_id, city_id) # Pass request
-            preferences_task = self._analyze_product_preferences(request, store_id, city_id) # Pass request
+            segmentation_task = self._perform_customer_segmentation(
+                request, store_id, city_id
+            )  # Pass request
+            patterns_task = self._identify_shopping_patterns(
+                request, store_id, city_id
+            )  # Pass request
+            lifecycle_task = self._analyze_customer_lifecycle(
+                request, store_id, city_id
+            )  # Pass request
+            preferences_task = self._analyze_product_preferences(
+                request, store_id, city_id
+            )  # Pass request
 
             segments, patterns, lifecycle, preferences = await asyncio.gather(
                 segmentation_task, patterns_task, lifecycle_task, preferences_task
@@ -96,7 +107,7 @@ class CustomerBehaviorService:
 
             # Store analysis results
             await self._store_behavior_analysis(
-                request, store_id, city_id, segments, patterns, insights # Pass request
+                request, store_id, city_id, segments, patterns, insights  # Pass request
             )
 
             return {
@@ -116,12 +127,15 @@ class CustomerBehaviorService:
             raise
 
     async def _perform_customer_segmentation(
-        self, request: Request, store_id: Optional[int] = None, city_id: Optional[int] = None # Add request
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        city_id: Optional[int] = None,  # Add request
     ) -> List[CustomerSegment]:
         """Perform advanced customer segmentation using RFM and behavioral analysis."""
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 # Create synthetic customer data based on transaction patterns
                 # In a real system, this would use actual customer IDs
                 query = (
@@ -377,27 +391,36 @@ class CustomerBehaviorService:
             return "reactivation_campaign"
 
     async def _identify_shopping_patterns(
-        self, request: Request, store_id: Optional[int] = None, city_id: Optional[int] = None # Add request
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        city_id: Optional[int] = None,  # Add request
     ) -> List[ShoppingPattern]:
         """Identify key shopping patterns and behaviors."""
         try:
             patterns = []
 
             # Pattern 1: Seasonal Shopping Patterns
-            seasonal_patterns = await self._analyze_seasonal_patterns(request, store_id, city_id) # Pass request
+            seasonal_patterns = await self._analyze_seasonal_patterns(
+                request, store_id, city_id
+            )  # Pass request
             patterns.extend(seasonal_patterns)
 
             # Pattern 2: Promotional Response Patterns
-            promo_patterns = await self._analyze_promotional_patterns(request, store_id, city_id) # Pass request
+            promo_patterns = await self._analyze_promotional_patterns(
+                request, store_id, city_id
+            )  # Pass request
             patterns.extend(promo_patterns)
 
             # Pattern 3: Day-of-Week Patterns
-            dow_patterns = await self._analyze_day_of_week_patterns(request, store_id, city_id) # Pass request
+            dow_patterns = await self._analyze_day_of_week_patterns(
+                request, store_id, city_id
+            )  # Pass request
             patterns.extend(dow_patterns)
 
             # Pattern 4: Product Affinity Patterns
             affinity_patterns = await self._analyze_product_affinity_patterns(
-                request, store_id, city_id # Pass request
+                request, store_id, city_id  # Pass request
             )
             patterns.extend(affinity_patterns)
 
@@ -414,14 +437,17 @@ class CustomerBehaviorService:
             return []
 
     async def _analyze_seasonal_patterns(
-        self, request: Request, store_id: Optional[int] = None, city_id: Optional[int] = None # Add request
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        city_id: Optional[int] = None,  # Add request
     ) -> List[ShoppingPattern]:
         """Analyze seasonal shopping patterns."""
         patterns = []
 
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 WITH seasonal_sales AS (
                     SELECT 
@@ -499,14 +525,17 @@ class CustomerBehaviorService:
         return patterns
 
     async def _analyze_promotional_patterns(
-        self, request: Request, store_id: Optional[int] = None, city_id: Optional[int] = None # Add request
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        city_id: Optional[int] = None,  # Add request
     ) -> List[ShoppingPattern]:
         """Analyze customer response to promotions."""
         patterns = []
 
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 WITH promotion_impact AS (
                     SELECT 
@@ -582,14 +611,17 @@ class CustomerBehaviorService:
         return patterns
 
     async def _analyze_day_of_week_patterns(
-        self, request: Request, store_id: Optional[int] = None, city_id: Optional[int] = None # Add request
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        city_id: Optional[int] = None,  # Add request
     ) -> List[ShoppingPattern]:
         """Analyze day-of-week shopping patterns."""
         patterns = []
 
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 WITH dow_analysis AS (
                     SELECT 
@@ -664,7 +696,10 @@ class CustomerBehaviorService:
         return patterns
 
     async def _analyze_product_affinity_patterns(
-        self, request: Request, store_id: Optional[int] = None, city_id: Optional[int] = None # Add request
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        city_id: Optional[int] = None,  # Add request
     ) -> List[ShoppingPattern]:
         """Analyze product affinity and cross-purchase patterns."""
         patterns = []
@@ -673,7 +708,7 @@ class CustomerBehaviorService:
             # This would typically analyze market basket data
             # For now, we'll simulate based on category relationships
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 WITH category_cooccurrence AS (
                     SELECT 
@@ -729,12 +764,15 @@ class CustomerBehaviorService:
         return patterns
 
     async def _analyze_customer_lifecycle(
-        self, request: Request, store_id: Optional[int] = None, city_id: Optional[int] = None # Add request
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        city_id: Optional[int] = None,  # Add request
     ) -> Dict[str, Any]:
         """Analyze customer lifecycle stages and transitions."""
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 # Simulate customer lifecycle analysis
                 query = """
                 WITH customer_lifecycle AS (
@@ -840,12 +878,15 @@ class CustomerBehaviorService:
             return {}
 
     async def _analyze_product_preferences(
-        self, request: Request, store_id: Optional[int] = None, city_id: Optional[int] = None # Add request
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        city_id: Optional[int] = None,  # Add request
     ) -> Dict[str, Any]:
         """Analyze product preferences across customer segments."""
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 WITH product_preferences AS (
                     SELECT 
@@ -1123,7 +1164,7 @@ class CustomerBehaviorService:
 
     async def _store_behavior_analysis(
         self,
-        request: Request, # Add request
+        request: Request,  # Add request
         store_id: Optional[int],
         city_id: Optional[int],
         segments: List[CustomerSegment],
@@ -1133,7 +1174,7 @@ class CustomerBehaviorService:
         """Store customer behavior analysis results."""
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 # Store main behavior analysis record
                 await conn.execute(
                     """
@@ -1208,11 +1249,13 @@ class CustomerBehaviorService:
         except Exception as e:
             self.logger.error(f"Error storing behavior analysis: {e}")
 
-    async def get_customer_segment_details(self, request: Request, segment_name: str) -> Dict[str, Any]: # Add request
+    async def get_customer_segment_details(
+        self, request: Request, segment_name: str
+    ) -> Dict[str, Any]:  # Add request
         """Get detailed information about a specific customer segment."""
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 # This would retrieve detailed segment information from database
                 # For now, simulate detailed analysis
 

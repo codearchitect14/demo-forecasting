@@ -14,7 +14,7 @@ import json
 import logging
 from dataclasses import dataclass
 from enum import Enum
-from fastapi import Request # Import Request
+from fastapi import Request  # Import Request
 
 # from database.connection import get_db_connection # Removed
 from utils.logger import get_logger
@@ -70,21 +70,23 @@ class RealTimeAlertsService:
             "performance_decline_threshold": 0.15,  # 15% decline
         }
 
-    async def monitor_all_stores(self, request: Request) -> List[AlertData]: # Add request
+    async def monitor_all_stores(
+        self, request: Request
+    ) -> List[AlertData]:  # Add request
         """Run comprehensive monitoring across all stores and generate alerts."""
         try:
             alerts = []
 
             # Get all active stores
-            stores = await self._get_active_stores(request) # Pass request
+            stores = await self._get_active_stores(request)  # Pass request
 
             # Run monitoring tasks in parallel
             monitoring_tasks = [
-                self._monitor_stockout_risks(stores, request), # Pass request
-                self._monitor_demand_anomalies(stores, request), # Pass request
-                self._monitor_weather_impacts(stores, request), # Pass request
-                self._monitor_promotion_opportunities(stores, request), # Pass request
-                self._monitor_performance_declines(stores, request), # Pass request
+                self._monitor_stockout_risks(stores, request),  # Pass request
+                self._monitor_demand_anomalies(stores, request),  # Pass request
+                self._monitor_weather_impacts(stores, request),  # Pass request
+                self._monitor_promotion_opportunities(stores, request),  # Pass request
+                self._monitor_performance_declines(stores, request),  # Pass request
             ]
 
             results = await asyncio.gather(*monitoring_tasks, return_exceptions=True)
@@ -99,7 +101,7 @@ class RealTimeAlertsService:
             alerts = self._prioritize_alerts(alerts)
 
             # Store alerts in database
-            await self._store_alerts(alerts, request) # Pass request
+            await self._store_alerts(alerts, request)  # Pass request
 
             return alerts
 
@@ -107,13 +109,15 @@ class RealTimeAlertsService:
             self.logger.error(f"Error in monitor_all_stores: {e}")
             raise
 
-    async def _monitor_stockout_risks(self, stores: List[Dict], request: Request) -> List[AlertData]: # Add request
+    async def _monitor_stockout_risks(
+        self, stores: List[Dict], request: Request
+    ) -> List[AlertData]:  # Add request
         """Monitor inventory levels and predict stockout risks."""
         alerts = []
 
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 SELECT 
                     s.store_id,
@@ -189,13 +193,15 @@ class RealTimeAlertsService:
 
         return alerts
 
-    async def _monitor_demand_anomalies(self, stores: List[Dict], request: Request) -> List[AlertData]: # Add request
+    async def _monitor_demand_anomalies(
+        self, stores: List[Dict], request: Request
+    ) -> List[AlertData]:  # Add request
         """Detect unusual demand patterns and spikes."""
         alerts = []
 
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 WITH recent_sales AS (
                     SELECT 
@@ -299,13 +305,15 @@ class RealTimeAlertsService:
 
         return alerts
 
-    async def _monitor_weather_impacts(self, stores: List[Dict], request: Request) -> List[AlertData]: # Add request
+    async def _monitor_weather_impacts(
+        self, stores: List[Dict], request: Request
+    ) -> List[AlertData]:  # Add request
         """Monitor weather conditions and their impact on sales."""
         alerts = []
 
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 # Get products with strong weather correlations
                 query = """
                 WITH weather_correlations AS (
@@ -422,13 +430,13 @@ class RealTimeAlertsService:
 
     async def _monitor_promotion_opportunities(
         self, stores: List[Dict], request: Request
-    ) -> List[AlertData]: # Add request
+    ) -> List[AlertData]:  # Add request
         """Identify promotion opportunities based on inventory and demand patterns."""
         alerts = []
 
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 WITH promotion_analysis AS (
                     SELECT 
@@ -518,13 +526,13 @@ class RealTimeAlertsService:
 
     async def _monitor_performance_declines(
         self, stores: List[Dict], request: Request
-    ) -> List[AlertData]: # Add request
+    ) -> List[AlertData]:  # Add request
         """Monitor store performance and detect declining trends."""
         alerts = []
 
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 WITH performance_comparison AS (
                     SELECT 
@@ -666,11 +674,11 @@ class RealTimeAlertsService:
 
         return deduplicated[:50]  # Limit to top 50 alerts
 
-    async def _get_active_stores(self, request: Request) -> List[Dict]: # Add request
+    async def _get_active_stores(self, request: Request) -> List[Dict]:  # Add request
         """Get list of active stores."""
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 SELECT DISTINCT store_id, city_id
                 FROM store_hierarchy
@@ -687,11 +695,13 @@ class RealTimeAlertsService:
             self.logger.error(f"Error getting active stores: {e}")
             return []
 
-    async def _store_alerts(self, alerts: List[AlertData], request: Request) -> None: # Add request
+    async def _store_alerts(
+        self, alerts: List[AlertData], request: Request
+    ) -> None:  # Add request
         """Store alerts in the database."""
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 for alert in alerts:
                     await conn.execute(
                         """
@@ -724,12 +734,15 @@ class RealTimeAlertsService:
             self.logger.error(f"Error storing alerts: {e}")
 
     async def get_active_alerts(
-        self, request: Request, store_id: Optional[int] = None, severity: Optional[str] = None # Add request
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        severity: Optional[str] = None,  # Add request
     ) -> List[Dict]:
         """Get active alerts with optional filtering."""
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                     SELECT 
                         alert_id,
@@ -777,11 +790,13 @@ class RealTimeAlertsService:
             self.logger.error(f"Error getting active alerts: {e}")
             return []
 
-    async def acknowledge_alert(self, alert_id: str, acknowledged_by: str, request: Request) -> bool: # Add request
+    async def acknowledge_alert(
+        self, alert_id: str, acknowledged_by: str, request: Request
+    ) -> bool:  # Add request
         """Acknowledge an alert."""
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 result = await conn.execute(
                     """
                     UPDATE real_time_alerts
@@ -800,11 +815,13 @@ class RealTimeAlertsService:
             self.logger.error(f"Error acknowledging alert: {e}")
             return False
 
-    async def resolve_alert(self, alert_id: str, resolution_status: str, request: Request) -> bool: # Add request
+    async def resolve_alert(
+        self, alert_id: str, resolution_status: str, request: Request
+    ) -> bool:  # Add request
         """Resolve an alert with a status."""
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 result = await conn.execute(
                     """
                     UPDATE real_time_alerts
@@ -821,11 +838,13 @@ class RealTimeAlertsService:
             self.logger.error(f"Error resolving alert: {e}")
             return False
 
-    async def get_alert_summary(self, request: Request, days: int = 7) -> Dict[str, Any]: # Add request
+    async def get_alert_summary(
+        self, request: Request, days: int = 7
+    ) -> Dict[str, Any]:  # Add request
         """Get alert summary statistics."""
         try:
             manager = request.app.state.db_manager
-            async with manager.get_connection() as conn: # Use manager.get_connection
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                     SELECT 
                         alert_type,

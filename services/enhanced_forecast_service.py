@@ -13,7 +13,7 @@ import numpy as np
 from dataclasses import dataclass
 from enum import Enum
 import json
-from fastapi import Request # Import Request
+from fastapi import Request  # Import Request
 
 # Import ML libraries
 from sklearn.ensemble import RandomForestRegressor
@@ -78,7 +78,7 @@ class EnhancedForecastService:
         self.scaler = StandardScaler()
 
     async def generate_multi_dimensional_forecast(
-        self, request_data: ForecastRequest, request: Request # Add request
+        self, request_data: ForecastRequest, request: Request  # Add request
     ) -> ForecastResult:
         """
         Generate multi-dimensional forecast with comparative analysis
@@ -94,7 +94,9 @@ class EnhancedForecastService:
         )
 
         # 1. Get historical data
-        historical_data = await self._get_comprehensive_historical_data(request_data, request)
+        historical_data = await self._get_comprehensive_historical_data(
+            request_data, request
+        )
 
         if historical_data.empty:
             raise ValueError(
@@ -102,18 +104,26 @@ class EnhancedForecastService:
             )
 
         # 2. Generate base forecasts
-        base_forecasts = await self._generate_base_forecasts(historical_data, request_data)
+        base_forecasts = await self._generate_base_forecasts(
+            historical_data, request_data
+        )
 
         # 3. Perform cross-store analysis if requested
         cross_store_analysis = None
-        if request_data.include_cross_store_analysis and len(request_data.store_ids) > 1:
+        if (
+            request_data.include_cross_store_analysis
+            and len(request_data.store_ids) > 1
+        ):
             cross_store_analysis = await self._perform_cross_store_analysis(
                 historical_data, base_forecasts, request_data
             )
 
         # 4. Analyze product correlations if requested
         product_correlations = None
-        if request_data.include_product_correlations and len(request_data.product_ids) > 1:
+        if (
+            request_data.include_product_correlations
+            and len(request_data.product_ids) > 1
+        ):
             product_correlations = await self._analyze_product_correlations(
                 historical_data, request_data
             )
@@ -145,7 +155,7 @@ class EnhancedForecastService:
         )
 
     async def _get_comprehensive_historical_data(
-        self, request_data: ForecastRequest, request: Request # Add request
+        self, request_data: ForecastRequest, request: Request  # Add request
     ) -> pd.DataFrame:
         """Get comprehensive historical data including all relevant factors"""
 

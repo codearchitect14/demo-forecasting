@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from fastapi import Request
+
 # from database.connection import get_pool
 
 logger = logging.getLogger(__name__)
@@ -79,7 +80,9 @@ class DynamicStoreService:
         try:
             # Get data for target store and all stores for comparison
             target_store_data = (
-                await self.get_store_data(request, store_id) if store_id else pd.DataFrame()
+                await self.get_store_data(request, store_id)
+                if store_id
+                else pd.DataFrame()
             )
             all_stores_data = await self.get_store_data(request, None, limit=5000)
 

@@ -14,7 +14,6 @@ logger = logging.getLogger(__name__)
 async def generate_forecast(
     model,
     request,
-    request_obj: Request,
     fetch_historical_data_fn=None,
     fetch_weather_data_fn=None,
     fetch_promotion_data_fn=None,
@@ -30,15 +29,15 @@ async def generate_forecast(
 
     # Await the data fetches
     print("DEBUG: Fetching historical data...")
-    df = await fetch_historical_data_fn(request_obj) if fetch_historical_data_fn else None
+    df = await fetch_historical_data_fn() if fetch_historical_data_fn else None
     print("DEBUG: Historical data fetched")
 
     print("DEBUG: Fetching weather data...")
-    weather_df = await fetch_weather_data_fn(request_obj) if fetch_weather_data_fn else None
+    weather_df = await fetch_weather_data_fn() if fetch_weather_data_fn else None
     print("DEBUG: Weather data fetched")
 
     print("DEBUG: Fetching promotion data...")
-    promo_df = await fetch_promotion_data_fn(request_obj) if fetch_promotion_data_fn else None
+    promo_df = await fetch_promotion_data_fn() if fetch_promotion_data_fn else None
     print("DEBUG: Promotion data fetched")
 
     print("DEBUG: DataFrame shape:", df.shape if df is not None else "None")
@@ -141,8 +140,7 @@ async def generate_forecast(
             promo_flags["discount"] = 0.0
             for _, promo in promo_df.iterrows():
                 promo_start = max(pd.to_datetime(promo["start_date"]), start_date)
-                promo_end = min(pd.to_datetime(promo["end_date"]),
-                                  end_date)
+                promo_end = min(pd.to_datetime(promo["end_date"]), end_date)
                 mask = (promo_flags["ds"] >= promo_start) & (
                     promo_flags["ds"] <= promo_end
                 )
@@ -233,7 +231,7 @@ async def generate_forecast(
 
 
 async def fetch_historical_data(
-    request: Request,
+    request: Request = None,
     store_id=None,
     product_id=None,
     category_id=None,
@@ -301,7 +299,7 @@ async def fetch_historical_data(
         query += f" AND sd.dt <= ${idx}"
         params.append(end_date)
         idx += 1
-    
+
     manager = request.app.state.db_manager
     async with manager.get_connection() as conn:
         records = await conn.fetch(query, *params)
@@ -357,8 +355,11 @@ async def fetch_historical_data(
 
 
 async def fetch_weather_data(
-    request: Request,
-    city_id=None, start_date=None, end_date=None, future_periods=0,
+    request: Request = None,
+    city_id=None,
+    start_date=None,
+    end_date=None,
+    future_periods=0,
 ) -> pd.DataFrame:
     """
     Async fetch weather data from the database using asyncpg.
@@ -414,7 +415,7 @@ async def fetch_weather_data(
 
 
 async def fetch_promotion_data(
-    request: Request,
+    request: Request = None,
     store_id=None,
     product_id=None,
     category_id=None,
@@ -513,8 +514,10 @@ async def fetch_promotion_data(
 
 
 async def fetch_holiday_data(
-    request: Request,
-    start_date=None, end_date=None, future_periods=0,
+    request: Request = None,
+    start_date=None,
+    end_date=None,
+    future_periods=0,
 ) -> pd.DataFrame:
     """
     Async fetch holiday data from the database using asyncpg.
@@ -577,10 +580,10 @@ async def analyze_promotion_effectiveness(
         for idx, row in df.iterrows():
             sale_date = pd.to_datetime(row["sale_date"])
             for _, promo in promo_data.iterrows():
-                promo_start = max(pd.to_datetime(promo["start_date"]),
-                                    sale_date)
-                promo_end = min(pd.to_datetime(promo["end_date"]),
-                                sale_date + timedelta(days=1))
+                promo_start = max(pd.to_datetime(promo["start_date"]), sale_date)
+                promo_end = min(
+                    pd.to_datetime(promo["end_date"]), sale_date + timedelta(days=1)
+                )
                 # Use .item() for scalar comparison if Series
                 store_id_match = False
                 product_id_match = False

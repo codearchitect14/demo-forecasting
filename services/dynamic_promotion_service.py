@@ -10,6 +10,7 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from fastapi import Request
+
 # from database.connection import get_pool # Removed
 
 logger = logging.getLogger(__name__)
@@ -27,7 +28,7 @@ class DynamicPromotionService:
     ) -> pd.DataFrame:
         """Fetch actual promotion and sales data from database."""
 
-        manager = request.app.state.db_manager # Access db_manager
+        manager = request.app.state.db_manager  # Access db_manager
 
         query = """
         SELECT 
@@ -49,7 +50,7 @@ class DynamicPromotionService:
         LIMIT $3
         """
 
-        async with manager.get_connection() as connection: # Use manager's connection
+        async with manager.get_connection() as connection:  # Use manager's connection
             rows = await connection.fetch(query, store_id, product_id, limit)
 
         if not rows:
@@ -66,7 +67,9 @@ class DynamicPromotionService:
 
         try:
             # Get historical promotion data
-            promotion_data = await self.get_promotion_data(request, store_id, product_id)
+            promotion_data = await self.get_promotion_data(
+                request, store_id, product_id
+            )
 
             if promotion_data.empty:
                 return {

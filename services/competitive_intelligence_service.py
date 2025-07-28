@@ -12,7 +12,7 @@ from decimal import Decimal
 import asyncio
 from dataclasses import dataclass
 import json
-from fastapi import Request # Import Request
+from fastapi import Request  # Import Request
 
 # from database.connection import get_db_connection # Removed
 from utils.logger import get_logger
@@ -74,9 +74,13 @@ class CompetitiveIntelligenceService:
         """Comprehensive competitive landscape analysis."""
         try:
             # Run parallel competitive analysis tasks
-            competitor_analysis_task = self._analyze_competitor_profiles(request, city_id)
+            competitor_analysis_task = self._analyze_competitor_profiles(
+                request, city_id
+            )
             threat_assessment_task = self._assess_market_threats(request, city_id)
-            opportunity_task = self._identify_competitive_opportunities(request, city_id)
+            opportunity_task = self._identify_competitive_opportunities(
+                request, city_id
+            )
             pricing_task = self._analyze_competitive_pricing(request, city_id)
 
             competitors, threats, opportunities, pricing_analysis = (
@@ -95,7 +99,12 @@ class CompetitiveIntelligenceService:
 
             # Store analysis results
             await self._store_competitive_analysis(
-                request, city_id, competitors, threats, opportunities, strategic_recommendations
+                request,
+                city_id,
+                competitors,
+                threats,
+                opportunities,
+                strategic_recommendations,
             )
 
             return {
@@ -897,7 +906,7 @@ class CompetitiveIntelligenceService:
 
     async def _store_competitive_analysis(
         self,
-        request: Request, # Add request
+        request: Request,  # Add request
         city_id: Optional[int],
         competitors: List[CompetitorProfile],
         threats: List[MarketThreat],
@@ -1065,7 +1074,10 @@ class CompetitiveIntelligenceService:
             return {}
 
     async def get_market_share_analysis(
-        self, request: Request, category_id: Optional[int] = None, city_id: Optional[int] = None
+        self,
+        request: Request,
+        category_id: Optional[int] = None,
+        city_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Get detailed market share analysis for specific category or overall market."""
         try:

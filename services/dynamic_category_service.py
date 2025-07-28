@@ -78,7 +78,10 @@ class DynamicCategoryService:
         return df
 
     async def analyze_category_performance(
-        self, request: Request, category_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        category_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Analyze category performance with dynamic insights."""
 
@@ -99,7 +102,9 @@ class DynamicCategoryService:
 
                 # Calculate market share (compared to all categories in same store)
                 if store_id:
-                    all_store_data = await self.get_category_data(request, None, store_id)
+                    all_store_data = await self.get_category_data(
+                        request, None, store_id
+                    )
                     store_total = all_store_data["sale_amount"].sum()
                     market_share = (
                         (total_sales / store_total * 100) if store_total > 0 else 0
@@ -273,7 +278,10 @@ class DynamicCategoryService:
         return {"peak_months": [12], "low_months": [2], "pattern": "insufficient_data"}
 
     async def get_category_recommendations(
-        self, request: Request, category_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        category_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> List[str]:
         """Generate dynamic category-specific recommendations."""
 
@@ -367,7 +375,10 @@ class DynamicCategoryService:
         return recommendations
 
     async def analyze_market_share(
-        self, request: Request, category_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        category_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Analyze market share for categories."""
         try:
@@ -438,7 +449,10 @@ class DynamicCategoryService:
             return self._generate_simulated_market_share()
 
     async def optimize_product_portfolio(
-        self, request: Request, category_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        category_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Optimize product portfolio."""
         try:
@@ -519,7 +533,10 @@ class DynamicCategoryService:
             return self._generate_simulated_portfolio_optimization()
 
     async def analyze_category_correlations(
-        self, request: Request, category_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        category_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Analyze category correlations."""
         try:
