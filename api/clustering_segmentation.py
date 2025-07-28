@@ -369,9 +369,10 @@ async def extract_product_features(
         logger.info(f"Selected available columns for products: {available_columns}")
         logger.info(f"DF columns after feature selection: {df.columns.tolist()}")
 
-        # Fill NaN values
+        # Fill NaN values and handle infinite values
         numeric_columns = df.select_dtypes(include=[np.number]).columns
         for col in numeric_columns:
+            df[col] = df[col].replace([np.inf, -np.inf], np.nan)
             df[col] = np.where(pd.isnull(df[col]), 0, df[col])
 
         logger.info(f"Extracted features for {len(df)} products")
@@ -544,9 +545,10 @@ async def extract_store_features(
         logger.info(f"Selected available columns for stores: {available_columns}")
         logger.info(f"DF columns after feature selection: {df.columns.tolist()}")
 
-        # Fill NaN values
+        # Fill NaN values and handle infinite values
         numeric_columns = df.select_dtypes(include=[np.number]).columns
         for col in numeric_columns:
+            df[col] = df[col].replace([np.inf, -np.inf], np.nan)
             df[col] = np.where(pd.isnull(df[col]), 0, df[col])
 
         logger.info(f"Extracted features for {len(df)} stores")
@@ -604,7 +606,7 @@ async def extract_city_features(
                     sh.city_id,
                     s.dt,
                     SUM(CAST(s.sale_amount AS FLOAT)) as daily_revenue
-                FROM sales_data
+                FROM sales_data s
                 JOIN store_hierarchy sh ON s.store_id = sh.store_id
                 WHERE s.dt BETWEEN $1 AND $2
                 GROUP BY sh.city_id, s.dt
@@ -624,34 +626,35 @@ async def extract_city_features(
         ),
         city_weather_data AS (
             SELECT 
-                s.city_id,
+                sh.city_id,
                 AVG(s.avg_temperature) as avg_temperature,
                 STDDEV(s.avg_temperature) as temp_variability,
                 AVG(s.precpt) as avg_precipitation,
                 AVG(s.avg_humidity) as avg_humidity,
                 COUNT(CASE WHEN s.precpt > 0 THEN 1 END)::FLOAT / COUNT(*) as rainy_days_ratio
             FROM sales_data s
+            JOIN store_hierarchy sh ON s.store_id = sh.store_id
             WHERE s.dt BETWEEN $1 AND $2
-            GROUP BY s.city_id
+            GROUP BY sh.city_id
         ),
         city_weather_sensitivity AS (
             SELECT 
-                s.city_id,
-                CORR(daily_revenue, w.avg_temperature) as temp_correlation,
-                CORR(daily_revenue, w.precpt) as precip_correlation,
-                CORR(daily_revenue, w.avg_humidity) as humidity_correlation
+                daily_rev.city_id,
+                CORR(daily_rev.daily_revenue, w.avg_temperature) as temp_correlation,
+                CORR(daily_rev.daily_revenue, w.precpt) as precip_correlation,
+                CORR(daily_rev.daily_revenue, w.avg_humidity) as humidity_correlation
             FROM (
                 SELECT 
                     sh.city_id,
                     s.dt,
                     SUM(CAST(s.sale_amount AS FLOAT)) as daily_revenue
-                FROM sales_data
+                FROM sales_data s
                 JOIN store_hierarchy sh ON s.store_id = sh.store_id
                 WHERE s.dt BETWEEN $1 AND $2
                 GROUP BY sh.city_id, s.dt
-            ) s
-            JOIN sales_data w ON s.city_id = w.city_id AND s.dt = w.dt
-            GROUP BY s.city_id
+            ) daily_rev
+            JOIN sales_data w ON daily_rev.city_id = w.city_id AND daily_rev.dt = w.dt
+            GROUP BY daily_rev.city_id
             HAVING COUNT(*) >= $3
         )
         SELECT 
@@ -739,9 +742,10 @@ async def extract_city_features(
         available_columns = [col for col in feature_columns if col in df.columns]
         df = df[available_columns]
 
-        # Fill NaN values
+        # Fill NaN values and handle infinite values
         numeric_columns = df.select_dtypes(include=[np.number]).columns
         for col in numeric_columns:
+            df[col] = df[col].replace([np.inf, -np.inf], np.nan)
             df[col] = np.where(pd.isnull(df[col]), 0, df[col])
 
         logger.info(f"Extracted features for {len(df)} cities")
@@ -927,13 +931,20 @@ async def generate_cluster_profiles(
 
             for feature in numeric_features:
                 if feature in cluster_data.columns:
+                    # Handle infinite and NaN values
+                    feature_data = cluster_data[feature].replace([np.inf, -np.inf], np.nan)
+                    mean_val = feature_data.mean()
+                    std_val = feature_data.std()
+                    min_val = feature_data.min()
+                    max_val = feature_data.max()
+                    
                     characteristics[feature] = {
-                        "mean": float(cluster_data[feature].mean()),
-                        "std": float(cluster_data[feature].std()),
-                        "min": float(cluster_data[feature].min()),
-                        "max": float(cluster_data[feature].max()),
+                        "mean": float(mean_val) if not pd.isna(mean_val) else 0.0,
+                        "std": float(std_val) if not pd.isna(std_val) else 0.0,
+                        "min": float(min_val) if not pd.isna(min_val) else 0.0,
+                        "max": float(max_val) if not pd.isna(max_val) else 0.0,
                     }
-                    key_metrics[f"{feature}_mean"] = float(cluster_data[feature].mean())
+                    key_metrics[f"{feature}_mean"] = float(mean_val) if not pd.isna(mean_val) else 0.0
 
             # Generate cluster name based on key characteristics
             cluster_name = generate_cluster_name(
@@ -1060,9 +1071,9 @@ def get_representative_entities(
                         "id": str(row["product_id"]),
                         "name": row.get("product_name", f"Product {row['product_id']}"),
                         "key_metrics": {
-                            "avg_sale_amount": row.get("avg_sale_amount", 0),
-                            "stockout_rate": row.get("stockout_rate", 0),
-                            "discount_frequency": row.get("discount_frequency", 0),
+                            "avg_sale_amount": float(row.get("avg_sale_amount", 0) or 0),
+                            "stockout_rate": float(row.get("stockout_rate", 0) or 0),
+                            "discount_frequency": float(row.get("discount_frequency", 0) or 0),
                         },
                     }
                 )
@@ -1073,9 +1084,9 @@ def get_representative_entities(
                         "name": row.get("store_name", f"Store {row['store_id']}"),
                         "city_id": str(row.get("city_id", "")),
                         "key_metrics": {
-                            "total_revenue": row.get("total_revenue", 0),
-                            "avg_stockout_rate": row.get("avg_stockout_rate", 0),
-                            "discount_frequency": row.get("discount_frequency", 0),
+                            "total_revenue": float(row.get("total_revenue", 0) or 0),
+                            "avg_stockout_rate": float(row.get("avg_stockout_rate", 0) or 0),
+                            "discount_frequency": float(row.get("discount_frequency", 0) or 0),
                         },
                     }
                 )
@@ -1085,16 +1096,14 @@ def get_representative_entities(
                         "id": str(row["city_id"]),
                         "name": f"City {row['city_id']}",
                         "key_metrics": {
-                            "total_revenue": row.get("total_revenue", 0),
-                            "num_stores": row.get("num_stores", 0),
-                            "avg_stockout_rate": row.get("avg_stockout_rate", 0),
+                            "total_revenue": float(row.get("total_revenue", 0) or 0),
+                            "num_stores": float(row.get("num_stores", 0) or 0),
+                            "avg_stockout_rate": float(row.get("avg_stockout_rate", 0) or 0),
                         },
                     }
                 )
 
-            entity_assignments.append(entity_info)
-
-        return entity_assignments
+        return representatives
 
     except Exception as e:
         logger.error(f"Error getting representative entities: {e}")
@@ -1140,12 +1149,12 @@ async def generate_entity_assignments(
                     cluster_name=f"Cluster {cluster_id}",
                     similarity_score=float(similarity_score),
                     key_attributes={
-                        "avg_sale_amount": row.get("avg_sale_amount", 0),
-                        "stockout_rate": row.get("stockout_rate", 0),
-                        "discount_frequency": row.get("discount_frequency", 0),
-                        "temperature_sensitivity": row.get(
+                        "avg_sale_amount": float(row.get("avg_sale_amount", 0) or 0),
+                        "stockout_rate": float(row.get("stockout_rate", 0) or 0),
+                        "discount_frequency": float(row.get("discount_frequency", 0) or 0),
+                        "temperature_sensitivity": float(row.get(
                             "temperature_sensitivity", 0
-                        ),
+                        ) or 0),
                     },
                 )
             elif entity_type == "stores":
@@ -1157,9 +1166,9 @@ async def generate_entity_assignments(
                     similarity_score=float(similarity_score),
                     key_attributes={
                         "city_id": str(row.get("city_id", "")),
-                        "total_revenue": row.get("total_revenue", 0),
-                        "avg_stockout_rate": row.get("avg_stockout_rate", 0),
-                        "discount_frequency": row.get("discount_frequency", 0),
+                        "total_revenue": float(row.get("total_revenue", 0) or 0),
+                        "avg_stockout_rate": float(row.get("avg_stockout_rate", 0) or 0),
+                        "discount_frequency": float(row.get("discount_frequency", 0) or 0),
                     },
                 )
             elif entity_type == "cities":
@@ -1170,10 +1179,10 @@ async def generate_entity_assignments(
                     cluster_name=f"Cluster {cluster_id}",
                     similarity_score=float(similarity_score),
                     key_attributes={
-                        "num_stores": row.get("num_stores", 0),
-                        "total_revenue": row.get("total_revenue", 0),
-                        "avg_stockout_rate": row.get("avg_stockout_rate", 0),
-                        "avg_temperature": row.get("avg_temperature", 0),
+                        "num_stores": float(row.get("num_stores", 0) or 0),
+                        "total_revenue": float(row.get("total_revenue", 0) or 0),
+                        "avg_stockout_rate": float(row.get("avg_stockout_rate", 0) or 0),
+                        "avg_temperature": float(row.get("avg_temperature", 0) or 0),
                     },
                 )
 
@@ -1200,26 +1209,33 @@ def calculate_cluster_quality_metrics(
 
         # Calculate silhouette score
         if len(set(cluster_labels)) > 1:
-            silhouette_avg = silhouette_score(X_scaled, cluster_labels)
-            quality_metrics["silhouette_score"] = float(silhouette_avg)
+            try:
+                silhouette_avg = silhouette_score(X_scaled, cluster_labels)
+                quality_metrics["silhouette_score"] = float(silhouette_avg) if not np.isnan(silhouette_avg) else 0.0
+            except:
+                quality_metrics["silhouette_score"] = 0.0
 
             # Calculate Calinski-Harabasz score
-            ch_score = calinski_harabasz_score(X_scaled, cluster_labels)
-            quality_metrics["calinski_harabasz_score"] = float(ch_score)
+            try:
+                ch_score = calinski_harabasz_score(X_scaled, cluster_labels)
+                quality_metrics["calinski_harabasz_score"] = float(ch_score) if not np.isnan(ch_score) else 0.0
+            except:
+                quality_metrics["calinski_harabasz_score"] = 0.0
         else:
             quality_metrics["silhouette_score"] = 0.0
             quality_metrics["calinski_harabasz_score"] = 0.0
 
         # Calculate inertia for KMeans
         if hasattr(clustering_result["clusterer"], "inertia_"):
-            quality_metrics["inertia"] = float(clustering_result["clusterer"].inertia_)
+            inertia_val = clustering_result["clusterer"].inertia_
+            quality_metrics["inertia"] = float(inertia_val) if not np.isnan(inertia_val) else 0.0
 
         # Calculate cluster size statistics
         unique_labels, counts = np.unique(cluster_labels, return_counts=True)
-        quality_metrics["avg_cluster_size"] = float(np.mean(counts))
-        quality_metrics["cluster_size_std"] = float(np.std(counts))
-        quality_metrics["min_cluster_size"] = float(np.min(counts))
-        quality_metrics["max_cluster_size"] = float(np.max(counts))
+        quality_metrics["avg_cluster_size"] = float(np.mean(counts)) if not np.isnan(np.mean(counts)) else 0.0
+        quality_metrics["cluster_size_std"] = float(np.std(counts)) if not np.isnan(np.std(counts)) else 0.0
+        quality_metrics["min_cluster_size"] = float(np.min(counts)) if not np.isnan(np.min(counts)) else 0.0
+        quality_metrics["max_cluster_size"] = float(np.max(counts)) if not np.isnan(np.max(counts)) else 0.0
 
         return quality_metrics
 
@@ -1268,9 +1284,11 @@ def generate_clustering_insights(
                     revenue_clusters,
                     key=lambda x: x.key_metrics["avg_sale_amount_mean"],
                 )
-                insights.append(
-                    f"Highest revenue cluster: '{high_revenue.cluster_name}' with average sale amount of ${high_revenue.key_metrics['avg_sale_amount_mean']:.2f}."
-                )
+                revenue_val = high_revenue.key_metrics['avg_sale_amount_mean']
+                if not np.isnan(revenue_val) and not np.isinf(revenue_val):
+                    insights.append(
+                        f"Highest revenue cluster: '{high_revenue.cluster_name}' with average sale amount of ${revenue_val:.2f}."
+                    )
 
             # Stockout insights
             stockout_clusters = [
@@ -1280,9 +1298,11 @@ def generate_clustering_insights(
                 high_stockout = max(
                     stockout_clusters, key=lambda x: x.key_metrics["stockout_rate_mean"]
                 )
-                insights.append(
-                    f"Highest stockout risk cluster: '{high_stockout.cluster_name}' with {high_stockout.key_metrics['stockout_rate_mean']:.1%} stockout rate."
-                )
+                stockout_val = high_stockout.key_metrics['stockout_rate_mean']
+                if not np.isnan(stockout_val) and not np.isinf(stockout_val):
+                    insights.append(
+                        f"Highest stockout risk cluster: '{high_stockout.cluster_name}' with {stockout_val:.1%} stockout rate."
+                    )
 
         elif entity_type == "stores":
             # Store performance insights
@@ -1293,9 +1313,11 @@ def generate_clustering_insights(
                 high_revenue = max(
                     revenue_clusters, key=lambda x: x.key_metrics["total_revenue_mean"]
                 )
-                insights.append(
-                    f"Top performing store cluster: '{high_revenue.cluster_name}' with average revenue of ${high_revenue.key_metrics['total_revenue_mean']:,.2f}."
-                )
+                revenue_val = high_revenue.key_metrics['total_revenue_mean']
+                if not np.isnan(revenue_val) and not np.isinf(revenue_val):
+                    insights.append(
+                        f"Top performing store cluster: '{high_revenue.cluster_name}' with average revenue of ${revenue_val:,.2f}."
+                    )
 
         elif entity_type == "cities":
             # City market insights
@@ -1306,9 +1328,11 @@ def generate_clustering_insights(
                 multi_store = max(
                     store_clusters, key=lambda x: x.key_metrics["num_stores_mean"]
                 )
-                insights.append(
-                    f"Largest market cluster: '{multi_store.cluster_name}' with average of {multi_store.key_metrics['num_stores_mean']:.1f} stores per city."
-                )
+                stores_val = multi_store.key_metrics['num_stores_mean']
+                if not np.isnan(stores_val) and not np.isinf(stores_val):
+                    insights.append(
+                        f"Largest market cluster: '{multi_store.cluster_name}' with average of {stores_val:.1f} stores per city."
+                    )
 
         # Actionable insights
         insights.append(
@@ -1338,7 +1362,8 @@ def generate_clustering_recommendations(
             if entity_type == "products":
                 # Product-specific recommendations
                 if "stockout_rate_mean" in profile.key_metrics:
-                    if profile.key_metrics["stockout_rate_mean"] > 0.2:
+                    stockout_val = profile.key_metrics["stockout_rate_mean"]
+                    if not np.isnan(stockout_val) and not np.isinf(stockout_val) and stockout_val > 0.2:
                         recommendations.append(
                             {
                                 "cluster_id": profile.cluster_id,
@@ -1346,13 +1371,14 @@ def generate_clustering_recommendations(
                                 "recommendation_type": "inventory_management",
                                 "priority": "high",
                                 "action": "Increase safety stock levels",
-                                "reason": f'High stockout rate of {profile.key_metrics["stockout_rate_mean"]:.1%}',
+                                "reason": f'High stockout rate of {stockout_val:.1%}',
                                 "expected_impact": "Reduce stockouts by 30-50%",
                             }
                         )
 
                 if "discount_frequency_mean" in profile.key_metrics:
-                    if profile.key_metrics["discount_frequency_mean"] > 0.3:
+                    discount_val = profile.key_metrics["discount_frequency_mean"]
+                    if not np.isnan(discount_val) and not np.isinf(discount_val) and discount_val > 0.3:
                         recommendations.append(
                             {
                                 "cluster_id": profile.cluster_id,
@@ -1360,7 +1386,7 @@ def generate_clustering_recommendations(
                                 "recommendation_type": "pricing_strategy",
                                 "priority": "medium",
                                 "action": "Implement dynamic pricing",
-                                "reason": f'High discount sensitivity ({profile.key_metrics["discount_frequency_mean"]:.1%})',
+                                "reason": f'High discount sensitivity ({discount_val:.1%})',
                                 "expected_impact": "Optimize profit margins by 10-15%",
                             }
                         )
@@ -1368,7 +1394,8 @@ def generate_clustering_recommendations(
             elif entity_type == "stores":
                 # Store-specific recommendations
                 if "avg_stockout_rate_mean" in profile.key_metrics:
-                    if profile.key_metrics["avg_stockout_rate_mean"] > 0.15:
+                    stockout_val = profile.key_metrics["avg_stockout_rate_mean"]
+                    if not np.isnan(stockout_val) and not np.isinf(stockout_val) and stockout_val > 0.15:
                         recommendations.append(
                             {
                                 "cluster_id": profile.cluster_id,
@@ -1376,13 +1403,14 @@ def generate_clustering_recommendations(
                                 "recommendation_type": "supply_chain",
                                 "priority": "high",
                                 "action": "Implement automated reordering",
-                                "reason": f'High stockout rate of {profile.key_metrics["avg_stockout_rate_mean"]:.1%}',
+                                "reason": f'High stockout rate of {stockout_val:.1%}',
                                 "expected_impact": "Improve stock availability by 25-40%",
                             }
                         )
 
                 if "total_revenue_mean" in profile.key_metrics:
-                    if profile.key_metrics["total_revenue_mean"] < 50000:
+                    revenue_val = profile.key_metrics["total_revenue_mean"]
+                    if not np.isnan(revenue_val) and not np.isinf(revenue_val) and revenue_val < 50000:
                         recommendations.append(
                             {
                                 "cluster_id": profile.cluster_id,
@@ -1390,7 +1418,7 @@ def generate_clustering_recommendations(
                                 "recommendation_type": "performance_improvement",
                                 "priority": "medium",
                                 "action": "Focus on customer acquisition",
-                                "reason": f'Low revenue performance (${profile.key_metrics["total_revenue_mean"]:,.2f})',
+                                "reason": f'Low revenue performance (${revenue_val:,.2f})',
                                 "expected_impact": "Increase revenue by 20-30%",
                             }
                         )
@@ -1398,7 +1426,8 @@ def generate_clustering_recommendations(
             elif entity_type == "cities":
                 # City-specific recommendations
                 if "num_stores_mean" in profile.key_metrics:
-                    if profile.key_metrics["num_stores_mean"] < 3:
+                    stores_val = profile.key_metrics["num_stores_mean"]
+                    if not np.isnan(stores_val) and not np.isinf(stores_val) and stores_val < 3:
                         recommendations.append(
                             {
                                 "cluster_id": profile.cluster_id,
@@ -1406,13 +1435,14 @@ def generate_clustering_recommendations(
                                 "recommendation_type": "market_expansion",
                                 "priority": "medium",
                                 "action": "Consider market expansion",
-                                "reason": f'Low store density ({profile.key_metrics["num_stores_mean"]:.1f} stores)',
+                                "reason": f'Low store density ({stores_val:.1f} stores)',
                                 "expected_impact": "Increase market coverage by 50-100%",
                             }
                         )
 
                 if "avg_stockout_rate_mean" in profile.key_metrics:
-                    if profile.key_metrics["avg_stockout_rate_mean"] > 0.2:
+                    stockout_val = profile.key_metrics["avg_stockout_rate_mean"]
+                    if not np.isnan(stockout_val) and not np.isinf(stockout_val) and stockout_val > 0.2:
                         recommendations.append(
                             {
                                 "cluster_id": profile.cluster_id,
@@ -1420,7 +1450,7 @@ def generate_clustering_recommendations(
                                 "recommendation_type": "regional_strategy",
                                 "priority": "high",
                                 "action": "Implement regional distribution center",
-                                "reason": f'High regional stockout rate ({profile.key_metrics["avg_stockout_rate_mean"]:.1%})',
+                                "reason": f'High regional stockout rate ({stockout_val:.1%})',
                                 "expected_impact": "Reduce regional stockouts by 40-60%",
                             }
                         )
