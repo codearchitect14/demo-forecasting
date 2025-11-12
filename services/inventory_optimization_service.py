@@ -14,8 +14,8 @@ import json
 from dataclasses import dataclass
 from scipy.spatial.distance import pdist, squareform
 from sklearn.cluster import DBSCAN
+from fastapi import Request  # Import Request
 
-from database.connection import get_db_connection
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -66,14 +66,20 @@ class InventoryOptimizationService:
         }
 
     async def analyze_cross_store_opportunities(
-        self, city_id: Optional[int] = None
+        self, request: Request, city_id: Optional[int] = None
     ) -> List[InventoryOpportunity]:
         """Identify cross-store inventory optimization opportunities."""
         try:
             # Get comprehensive inventory analysis
-            inventory_data = await self._get_inventory_analysis(city_id)
-            store_profiles = await self._generate_store_profiles(city_id)
-            transfer_costs = await self._calculate_transfer_costs(city_id)
+            inventory_data = await self._get_inventory_analysis(
+                request, city_id
+            )  # Pass request
+            store_profiles = await self._generate_store_profiles(
+                request, city_id
+            )  # Pass request
+            transfer_costs = await self._calculate_transfer_costs(
+                request, city_id
+            )  # Pass request
 
             opportunities = []
 
@@ -90,7 +96,9 @@ class InventoryOptimizationService:
             opportunities = self._prioritize_opportunities(opportunities)
 
             # Store analysis results
-            await self._store_optimization_analysis(opportunities)
+            await self._store_optimization_analysis(
+                opportunities, request
+            )  # Pass request
 
             return opportunities[:50]  # Return top 50 opportunities
 
@@ -99,11 +107,12 @@ class InventoryOptimizationService:
             raise
 
     async def _get_inventory_analysis(
-        self, city_id: Optional[int] = None
+        self, request: Request, city_id: Optional[int] = None
     ) -> List[Dict]:
         """Get comprehensive inventory analysis across stores."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 WITH inventory_metrics AS (
                     SELECT 
@@ -130,7 +139,7 @@ class InventoryOptimizationService:
 
                 params = []
                 if city_id is not None:
-                    query += " AND sh.city_id = $1"
+                    query += " AND sh.city_id = $3"
                     params.append(city_id)
 
                 query += """
@@ -144,8 +153,8 @@ class InventoryOptimizationService:
                         product_id,
                         avg_daily_sales,
                         CASE 
-                            WHEN sales_stddev > 0 AND avg_daily_sales > 0
-                            THEN avg_daily_sales * %s  -- Safety stock multiplier
+                            WHEN sales_stddev > 0 
+                            THEN avg_daily_sales * $1  -- Safety stock multiplier
                             ELSE avg_daily_sales * 2
                         END as recommended_safety_stock
                     FROM inventory_metrics
@@ -161,19 +170,26 @@ class InventoryOptimizationService:
                     CASE 
                         WHEN im.avg_daily_sales > 0 AND im.current_stock <= df.recommended_safety_stock
                         THEN 'stockout_risk'
-                        WHEN im.avg_daily_sales > 0 AND im.current_stock > im.avg_daily_sales * %s
+                        WHEN im.avg_daily_sales > 0 AND im.current_stock > im.avg_daily_sales * $2
                         THEN 'overstock'
                         ELSE 'normal'
                     END as stock_status
                 FROM inventory_metrics im
                 JOIN demand_forecast df ON im.store_id = df.store_id AND im.product_id = df.product_id
                 ORDER BY im.city_id, im.product_id, im.store_id
-                """ % (
+                """
+
+                # Parameters for the main query: safety_stock_multiplier, overstock_threshold_days
+                # If city_id is present, it will be the 3rd parameter ($3)
+                query_params = [
                     self.optimization_params["safety_stock_multiplier"],
                     self.optimization_params["overstock_threshold_days"],
-                )
+                ]
+                if city_id is not None:
+                    query_params.append(city_id)
 
-                result = await conn.fetch(query, *params)
+                result = await conn.fetch(query, *query_params)
+
                 return [dict(row) for row in result]
 
         except Exception as e:
@@ -181,11 +197,12 @@ class InventoryOptimizationService:
             return []
 
     async def _generate_store_profiles(
-        self, city_id: Optional[int] = None
+        self, request: Request, city_id: Optional[int] = None
     ) -> Dict[int, StoreInventoryProfile]:
         """Generate comprehensive profiles for each store."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 WITH store_metrics AS (
                     SELECT 
@@ -248,11 +265,12 @@ class InventoryOptimizationService:
             return {}
 
     async def _calculate_transfer_costs(
-        self, city_id: Optional[int] = None
+        self, request: Request, city_id: Optional[int] = None
     ) -> Dict[Tuple[int, int], Decimal]:
         """Calculate transfer costs between stores based on distance."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 SELECT 
                     store_id,
@@ -426,7 +444,7 @@ class InventoryOptimizationService:
                     transfer_cost=transfer_cost,
                     urgency_level=urgency_level,
                     implementation_priority=priority,
-                    reasoning=f"Transfer {recommended_quantity} units from overstocked Store {excess_item['store_id']} ({excess_item['days_of_inventory']:.1f} days inventory) to shortage Store {shortage_item['store_id']} ({shortage_item['days_of_inventory']:.1f} days inventory)",
+                    reasoning=f"Transfer {recommended_quantity} units from overstocked Store {excess_item['store_id']} ({excess_item['days_of_inventory']:.1f} days inventory) to shortage Store {shortage_item['days_of_inventory']:.1f} days inventory)",
                     expected_benefit={
                         "source_days_reduction": excess_item["days_of_inventory"]
                         - (excess_item["current_stock"] - recommended_quantity)
@@ -532,11 +550,12 @@ class InventoryOptimizationService:
         return opportunities
 
     async def _store_optimization_analysis(
-        self, opportunities: List[InventoryOpportunity]
+        self, opportunities: List[InventoryOpportunity], request: Request
     ) -> None:
         """Store optimization analysis results in database."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:
                 # Clear old analysis for today
                 await conn.execute(
                     """
@@ -573,10 +592,13 @@ class InventoryOptimizationService:
         except Exception as e:
             self.logger.error(f"Error storing optimization analysis: {e}")
 
-    async def get_store_optimization_summary(self, store_id: int) -> Dict[str, Any]:
+    async def get_store_optimization_summary(
+        self, request: Request, store_id: int
+    ) -> Dict[str, Any]:
         """Get optimization summary for a specific store."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:
                 # Get opportunities where this store is involved
                 query = """
                 SELECT 
@@ -633,10 +655,13 @@ class InventoryOptimizationService:
             self.logger.error(f"Error getting store optimization summary: {e}")
             return {}
 
-    async def get_city_optimization_overview(self, city_id: int) -> Dict[str, Any]:
+    async def get_city_optimization_overview(
+        self, request: Request, city_id: int
+    ) -> Dict[str, Any]:
         """Get optimization overview for an entire city."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:
                 query = """
                 SELECT 
                     COUNT(*) as total_opportunities,
@@ -665,11 +690,17 @@ class InventoryOptimizationService:
             return {}
 
     async def execute_transfer_recommendation(
-        self, source_store_id: int, target_store_id: int, product_id: int, quantity: int
+        self,
+        source_store_id: int,
+        target_store_id: int,
+        product_id: int,
+        quantity: int,
+        request: Request,
     ) -> Dict[str, Any]:
         """Simulate execution of a transfer recommendation."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:
                 # In a real system, this would integrate with inventory management
                 # For now, we'll create a transfer record and update optimization status
 
@@ -712,11 +743,12 @@ class InventoryOptimizationService:
             return {"status": "error", "message": str(e)}
 
     async def get_transfer_history(
-        self, store_id: Optional[int] = None, days: int = 30
+        self, request: Request, store_id: Optional[int] = None, days: int = 30
     ) -> List[Dict]:
         """Get transfer history for analysis."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:
                 query = (
                     """
                 SELECT 

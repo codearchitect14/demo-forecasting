@@ -15,10 +15,11 @@ import json
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 import warnings
+from fastapi import Request  # Import Request
 
 warnings.filterwarnings("ignore")
 
-from database.connection import db_manager
+# from database.connection import db_manager # Removed
 
 logger = logging.getLogger(__name__)
 
@@ -64,44 +65,46 @@ class EnhancedPromotionService:
         self.scaler = StandardScaler()
 
     async def analyze_promotion_impact(
-        self, request: PromotionAnalysisRequest
+        self, request_data: PromotionAnalysisRequest, request: Request  # Add request
     ) -> PromotionAnalysisResult:
         """Comprehensive promotion impact analysis"""
 
         logger.info(
-            f"Analyzing promotion impact for {len(request.product_ids)} products"
+            f"Analyzing promotion impact for {len(request_data.product_ids)} products"
         )
 
         # Get historical data
-        historical_data = await self._get_promotion_sales_data(request)
+        historical_data = await self._get_promotion_sales_data(
+            request_data, request
+        )  # Pass request
 
         if historical_data.empty:
             raise ValueError("No historical data available")
 
         # Analyze promotion effectiveness
         effectiveness = await self._analyze_promotion_effectiveness(
-            historical_data, request
+            historical_data, request_data
         )
 
         # Cross-product effects analysis
         cross_effects = None
-        if request.include_cross_product_effects:
+        if request_data.include_cross_product_effects:
             cross_effects = await self._analyze_cross_product_effects(
-                historical_data, request
+                historical_data, request_data, request  # Pass request
             )
 
         # Cannibalization analysis
         cannibalization = None
-        if request.include_cannibalization_analysis:
+        if request_data.include_cannibalization_analysis:
             cannibalization = await self._analyze_cannibalization(
-                historical_data, request
+                historical_data, request_data
             )
 
         # ROI optimization
         roi_optimization = None
-        if request.include_roi_optimization:
+        if request_data.include_roi_optimization:
             roi_optimization = await self._optimize_promotion_roi(
-                historical_data, request
+                historical_data, request_data
             )
 
         # Generate recommendations
@@ -118,16 +121,19 @@ class EnhancedPromotionService:
         )
 
     async def _get_promotion_sales_data(
-        self, request: PromotionAnalysisRequest
+        self, request_data: PromotionAnalysisRequest, request: Request  # Add request
     ) -> pd.DataFrame:
         """Get sales data with promotion information"""
 
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=request.analysis_period_days)
+        start_date = end_date - timedelta(days=request_data.analysis_period_days)
 
-        sales_data = await db_manager.get_sales_data(
-            store_ids=request.store_ids,
-            product_ids=request.product_ids,
+        # Access db_manager from app.state
+        manager = request.app.state.db_manager
+
+        sales_data = await manager.get_sales_data(  # Use manager.get_sales_data
+            store_ids=request_data.store_ids,
+            product_ids=request_data.product_ids,
             start_date=start_date,
             end_date=end_date,
         )
@@ -136,11 +142,13 @@ class EnhancedPromotionService:
         sales_data["is_promoted"] = (sales_data["discount"] < 1.0).astype(int)
         sales_data["discount_percentage"] = (1 - sales_data["discount"]) * 100
         sales_data["promotion_depth"] = np.where(
-            sales_data["discount_percentage"] > 0,
+            sales_data["discount_percentage"].notna(),  # Check for non-NaN values
             pd.cut(
                 sales_data["discount_percentage"],
                 bins=[0, 10, 20, 30, 50, 100],
                 labels=["light", "moderate", "deep", "very_deep", "extreme"],
+                right=False,  # Make bins inclusive on the left
+                include_lowest=True,
             ),
             "none",
         )
@@ -234,22 +242,28 @@ class EnhancedPromotionService:
         return effectiveness
 
     async def _analyze_cross_product_effects(
-        self, data: pd.DataFrame, request: PromotionAnalysisRequest
+        self,
+        data: pd.DataFrame,
+        request_data: PromotionAnalysisRequest,
+        request: Request,  # Add request
     ) -> Dict[str, Any]:
         """Analyze cross-product promotion effects"""
 
         cross_effects = {}
 
+        # Access db_manager from app.state
+        manager = request.app.state.db_manager
+
         # Get product correlations for cross-selling analysis
-        correlations = await db_manager.calculate_product_correlations(
-            analysis_period_days=request.analysis_period_days
+        correlations = await manager.calculate_product_correlations(  # Use manager.calculate_product_correlations
+            analysis_period_days=request_data.analysis_period_days
         )
 
-        for product_id in request.product_ids:
+        for product_id in request_data.product_ids:
             product_effects = {}
 
             # Find correlated products
-            product_correlations = await db_manager.get_product_correlations(
+            product_correlations = await manager.get_product_correlations(  # Use manager.get_product_correlations
                 product_id=product_id, correlation_threshold=0.3
             )
 
@@ -277,7 +291,8 @@ class EnhancedPromotionService:
     async def _analyze_cannibalization(
         self, data: pd.DataFrame, request: PromotionAnalysisRequest
     ) -> Dict[str, Any]:
-        """Analyze cannibalization effects of promotions"""
+        """
+        Analyze cannibalization effects of promotions"""
 
         cannibalization = {}
 
@@ -494,7 +509,8 @@ class EnhancedPromotionService:
         cannibalization: Optional[Dict[str, Any]],
         roi_optimization: Optional[Dict[str, Any]],
     ) -> List[str]:
-        """Generate promotion optimization recommendations"""
+        """
+        Generate promotion optimization recommendations"""
 
         recommendations = []
 
@@ -570,13 +586,13 @@ class EnhancedPromotionService:
         return recommendations[:12]
 
 
-# Export the service
-enhanced_promotion_service = EnhancedPromotionService()
+# Export the service - REMOVED GLOBAL INSTANTIATION
+# enhanced_promotion_service = EnhancedPromotionService()
 
 __all__ = [
     "EnhancedPromotionService",
     "PromotionAnalysisRequest",
     "PromotionAnalysisResult",
     "PromotionType",
-    "enhanced_promotion_service",
+    # "enhanced_promotion_service", # Removed
 ]

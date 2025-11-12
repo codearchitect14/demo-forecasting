@@ -13,6 +13,7 @@ import numpy as np
 from dataclasses import dataclass
 from enum import Enum
 import json
+from fastapi import Request  # Import Request
 
 # Import ML libraries
 from sklearn.ensemble import RandomForestRegressor
@@ -23,7 +24,7 @@ import warnings
 warnings.filterwarnings("ignore")
 
 # Import our database manager
-from database.connection import db_manager, get_db_connection
+# from database.connection import db_manager, get_db_connection # Removed
 from models.prophet_forecaster import ProphetForecaster
 
 logger = logging.getLogger(__name__)
@@ -77,7 +78,7 @@ class EnhancedForecastService:
         self.scaler = StandardScaler()
 
     async def generate_multi_dimensional_forecast(
-        self, request: ForecastRequest
+        self, request_data: ForecastRequest, request: Request  # Add request
     ) -> ForecastResult:
         """
         Generate multi-dimensional forecast with comparative analysis
@@ -89,11 +90,13 @@ class EnhancedForecastService:
             ForecastResult with comprehensive analysis
         """
         logger.info(
-            f"Generating multi-dimensional forecast for stores: {request.store_ids}, products: {request.product_ids}"
+            f"Generating multi-dimensional forecast for stores: {request_data.store_ids}, products: {request_data.product_ids}"
         )
 
         # 1. Get historical data
-        historical_data = await self._get_comprehensive_historical_data(request)
+        historical_data = await self._get_comprehensive_historical_data(
+            request_data, request
+        )
 
         if historical_data.empty:
             raise ValueError(
@@ -101,25 +104,33 @@ class EnhancedForecastService:
             )
 
         # 2. Generate base forecasts
-        base_forecasts = await self._generate_base_forecasts(historical_data, request)
+        base_forecasts = await self._generate_base_forecasts(
+            historical_data, request_data
+        )
 
         # 3. Perform cross-store analysis if requested
         cross_store_analysis = None
-        if request.include_cross_store_analysis and len(request.store_ids) > 1:
+        if (
+            request_data.include_cross_store_analysis
+            and len(request_data.store_ids) > 1
+        ):
             cross_store_analysis = await self._perform_cross_store_analysis(
-                historical_data, base_forecasts, request
+                historical_data, base_forecasts, request_data
             )
 
         # 4. Analyze product correlations if requested
         product_correlations = None
-        if request.include_product_correlations and len(request.product_ids) > 1:
+        if (
+            request_data.include_product_correlations
+            and len(request_data.product_ids) > 1
+        ):
             product_correlations = await self._analyze_product_correlations(
-                historical_data, request
+                historical_data, request_data
             )
 
         # 5. Calculate confidence intervals
         confidence_intervals = self._calculate_confidence_intervals(
-            base_forecasts, request.confidence_level
+            base_forecasts, request_data.confidence_level
         )
 
         # 6. Calculate model metrics
@@ -144,7 +155,7 @@ class EnhancedForecastService:
         )
 
     async def _get_comprehensive_historical_data(
-        self, request: ForecastRequest
+        self, request_data: ForecastRequest, request: Request  # Add request
     ) -> pd.DataFrame:
         """Get comprehensive historical data including all relevant factors"""
 
@@ -152,9 +163,10 @@ class EnhancedForecastService:
         end_date = datetime.now()
         start_date = end_date - timedelta(days=365)  # 1 year of history
 
-        sales_data = await db_manager.get_sales_data(
-            store_ids=request.store_ids,
-            product_ids=request.product_ids,
+        manager = request.app.state.db_manager
+        sales_data = await manager.get_sales_data(
+            store_ids=request_data.store_ids,
+            product_ids=request_data.product_ids,
             start_date=start_date,
             end_date=end_date,
             include_hourly=True,
@@ -165,9 +177,9 @@ class EnhancedForecastService:
             return sales_data
 
         # Enrich with additional data
-        if request.include_weather_factors:
-            weather_data = await db_manager.get_weather_impact_data(
-                product_ids=request.product_ids, include_sales_data=False
+        if request_data.include_weather_factors:
+            weather_data = await manager.get_weather_impact_data(
+                product_ids=request_data.product_ids, include_sales_data=False
             )
             if not weather_data.empty:
                 sales_data = sales_data.merge(
@@ -184,10 +196,10 @@ class EnhancedForecastService:
                     how="left",
                 )
 
-        if request.include_promotion_factors:
-            promotion_data = await db_manager.get_promotion_effectiveness(
-                store_ids=request.store_ids,
-                product_ids=request.product_ids,
+        if request_data.include_promotion_factors:
+            promotion_data = await manager.get_promotion_effectiveness(
+                store_ids=request_data.store_ids,
+                product_ids=request_data.product_ids,
                 start_date=start_date,
                 end_date=end_date,
             )
@@ -214,8 +226,8 @@ class EnhancedForecastService:
         ).dt.days
 
         # Add lag features
-        for store_id in request.store_ids:
-            for product_id in request.product_ids:
+        for store_id in request_data.store_ids:
+            for product_id in request_data.product_ids:
                 mask = (sales_data["store_id"] == store_id) & (
                     sales_data["product_id"] == product_id
                 )
@@ -251,14 +263,14 @@ class EnhancedForecastService:
         return sales_data.fillna(0)
 
     async def _generate_base_forecasts(
-        self, historical_data: pd.DataFrame, request: ForecastRequest
+        self, historical_data: pd.DataFrame, request_data: ForecastRequest
     ) -> pd.DataFrame:
         """Generate base forecasts using the specified method"""
 
         forecasts = []
 
-        for store_id in request.store_ids:
-            for product_id in request.product_ids:
+        for store_id in request_data.store_ids:
+            for product_id in request_data.product_ids:
                 # Filter data for this store-product combination
                 store_product_data = historical_data[
                     (historical_data["store_id"] == store_id)
@@ -272,21 +284,21 @@ class EnhancedForecastService:
                     continue
 
                 # Generate forecast based on method
-                if request.forecasting_method == ForecastingMethod.PROPHET:
+                if request_data.forecasting_method == ForecastingMethod.PROPHET:
                     forecast = await self._generate_prophet_forecast(
-                        store_product_data, request.forecast_horizon_days
+                        store_product_data, request_data.forecast_horizon_days
                     )
-                elif request.forecasting_method == ForecastingMethod.RANDOM_FOREST:
+                elif request_data.forecasting_method == ForecastingMethod.RANDOM_FOREST:
                     forecast = self._generate_rf_forecast(
-                        store_product_data, request.forecast_horizon_days
+                        store_product_data, request_data.forecast_horizon_days
                     )
-                elif request.forecasting_method == ForecastingMethod.ENSEMBLE:
+                elif request_data.forecasting_method == ForecastingMethod.ENSEMBLE:
                     forecast = await self._generate_ensemble_forecast(
-                        store_product_data, request.forecast_horizon_days
+                        store_product_data, request_data.forecast_horizon_days
                     )
                 else:  # NAIVE
                     forecast = self._generate_naive_forecast(
-                        store_product_data, request.forecast_horizon_days
+                        store_product_data, request_data.forecast_horizon_days
                     )
 
                 # Add store and product identifiers
@@ -541,13 +553,13 @@ class EnhancedForecastService:
         self,
         historical_data: pd.DataFrame,
         forecasts: pd.DataFrame,
-        request: ForecastRequest,
+        request_data: ForecastRequest,
     ) -> Dict[str, Any]:
         """Perform cross-store comparative analysis"""
 
         cross_store_analysis = {}
 
-        for product_id in request.product_ids:
+        for product_id in request_data.product_ids:
             product_analysis = {}
 
             # Get forecasts for this product across all stores
@@ -558,7 +570,7 @@ class EnhancedForecastService:
 
             # Calculate store performance metrics
             store_metrics = []
-            for store_id in request.store_ids:
+            for store_id in request_data.store_ids:
                 store_forecast = product_forecasts[
                     product_forecasts["store_id"] == store_id
                 ]
@@ -634,13 +646,13 @@ class EnhancedForecastService:
         return cross_store_analysis
 
     async def _analyze_product_correlations(
-        self, historical_data: pd.DataFrame, request: ForecastRequest
+        self, historical_data: pd.DataFrame, request_data: ForecastRequest
     ) -> Dict[str, Any]:
         """Analyze product correlations for cross-selling opportunities"""
 
         correlations = {}
 
-        for store_id in request.store_ids:
+        for store_id in request_data.store_ids:
             store_data = historical_data[historical_data["store_id"] == store_id]
 
             if store_data.empty:
@@ -834,8 +846,8 @@ class EnhancedForecastService:
         return recommendations[:10]  # Return top 10 recommendations
 
 
-# Export the service
-enhanced_forecast_service = EnhancedForecastService()
+# Export the service - REMOVED GLOBAL INSTANTIATION
+# enhanced_forecast_service = EnhancedForecastService()
 
 __all__ = [
     "EnhancedForecastService",

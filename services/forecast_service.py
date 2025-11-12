@@ -1,10 +1,10 @@
-import asyncpg  # type: ignore
 from datetime import datetime, timedelta
 from typing import Dict, List, Optional, Any
 import pandas as pd
 import logging
 import asyncio
 import numpy as np
+from fastapi import Request
 
 logger = logging.getLogger(__name__)
 
@@ -231,13 +231,13 @@ async def generate_forecast(
 
 
 async def fetch_historical_data(
+    request: Request = None,
     store_id=None,
     product_id=None,
     category_id=None,
     city_id=None,
     start_date=None,
     end_date=None,
-    conn=None,
 ) -> pd.DataFrame:
     """
     Async fetch historical sales data from the database using asyncpg.
@@ -299,8 +299,11 @@ async def fetch_historical_data(
         query += f" AND sd.dt <= ${idx}"
         params.append(end_date)
         idx += 1
-    query += " ORDER BY sd.dt"
-    records = await conn.fetch(query, *params)
+
+    manager = request.app.state.db_manager
+    async with manager.get_connection() as conn:
+        records = await conn.fetch(query, *params)
+
     df = (
         pd.DataFrame(records, columns=[k for k in records[0].keys()])
         if records
@@ -352,7 +355,11 @@ async def fetch_historical_data(
 
 
 async def fetch_weather_data(
-    city_id=None, start_date=None, end_date=None, future_periods=0, conn=None
+    request: Request = None,
+    city_id=None,
+    start_date=None,
+    end_date=None,
+    future_periods=0,
 ) -> pd.DataFrame:
     """
     Async fetch weather data from the database using asyncpg.
@@ -394,7 +401,11 @@ async def fetch_weather_data(
         params.append(end_date)
         idx += 1
     query += " ORDER BY date"
-    records = await conn.fetch(query, *params)
+
+    manager = request.app.state.db_manager
+    async with manager.get_connection() as conn:
+        records = await conn.fetch(query, *params)
+
     df = (
         pd.DataFrame(records, columns=[k for k in records[0].keys()])
         if records
@@ -404,13 +415,13 @@ async def fetch_weather_data(
 
 
 async def fetch_promotion_data(
+    request: Request = None,
     store_id=None,
     product_id=None,
     category_id=None,
     start_date=None,
     end_date=None,
     future_periods=0,
-    conn=None,
 ) -> pd.DataFrame:
     """
     Async fetch promotion data from the database using asyncpg.
@@ -462,7 +473,11 @@ async def fetch_promotion_data(
         params.append(end_date)
         idx += 1
     query += " ORDER BY pe.start_date"
-    records = await conn.fetch(query, *params)
+
+    manager = request.app.state.db_manager
+    async with manager.get_connection() as conn:
+        records = await conn.fetch(query, *params)
+
     df = (
         pd.DataFrame(records, columns=[k for k in records[0].keys()])
         if records
@@ -499,7 +514,10 @@ async def fetch_promotion_data(
 
 
 async def fetch_holiday_data(
-    start_date=None, end_date=None, future_periods=0, conn=None
+    request: Request = None,
+    start_date=None,
+    end_date=None,
+    future_periods=0,
 ) -> pd.DataFrame:
     """
     Async fetch holiday data from the database using asyncpg.
@@ -534,7 +552,11 @@ async def fetch_holiday_data(
         params.append(end_date)
         idx += 1
     query += " ORDER BY date"
-    records = await conn.fetch(query, *params)
+
+    manager = request.app.state.db_manager
+    async with manager.get_connection() as conn:
+        records = await conn.fetch(query, *params)
+
     df = (
         pd.DataFrame(records, columns=[k for k in records[0].keys()])
         if records
@@ -558,8 +580,10 @@ async def analyze_promotion_effectiveness(
         for idx, row in df.iterrows():
             sale_date = pd.to_datetime(row["sale_date"])
             for _, promo in promo_data.iterrows():
-                promo_start = pd.to_datetime(promo["start_date"])
-                promo_end = pd.to_datetime(promo["end_date"])
+                promo_start = max(pd.to_datetime(promo["start_date"]), sale_date)
+                promo_end = min(
+                    pd.to_datetime(promo["end_date"]), sale_date + timedelta(days=1)
+                )
                 # Use .item() for scalar comparison if Series
                 store_id_match = False
                 product_id_match = False

@@ -17,6 +17,8 @@ from contextlib import asynccontextmanager
 import os
 from dotenv import load_dotenv
 from .config import get_db_config
+import hashlib
+from fastapi import Request  # Import Request for type hinting in decorator
 
 # Load environment variables
 load_dotenv()
@@ -24,6 +26,9 @@ load_dotenv()
 # Configure logging
 logging.basicConfig(level=logging.INFO)
 logger = logging.getLogger(__name__)
+
+# Set the logger level to DEBUG for this module
+logger.setLevel(logging.DEBUG)
 
 
 class DatabaseManager:
@@ -37,6 +42,9 @@ class DatabaseManager:
         self.query_cache: Dict[str, Any] = {}
         self.cache_ttl: int = 300  # 5 minutes default TTL
         self.max_cache_size: int = 1000
+        logger.debug(
+            f"DatabaseManager initialized. query_cache ID: {id(self.query_cache)}"
+        )
 
         # Database configuration
         self.db_config = get_db_config()
@@ -75,14 +83,21 @@ class DatabaseManager:
     async def get_connection(self):
         """Get database connection from pool"""
         if not self.pool:
-            await self.initialize()
+            # This should ideally be initialized by startup event
+            raise RuntimeError("Database pool not initialized.")
 
         async with self.pool.acquire() as connection:
             yield connection
 
     def cache_key(self, query: str, params: tuple = ()) -> str:
         """Generate cache key for query and parameters"""
-        return f"{hash(query)}_{hash(params)}"
+        # Convert any list within params to tuple to make it hashable
+        hashable_params = tuple(tuple(p) if isinstance(p, list) else p for p in params)
+        key = f"{hash(query)}_{hash(hashable_params)}"
+        logger.debug(
+            f"Generated cache key for query: {query[:50]}... with params: {params} -> {key}"
+        )
+        return key
 
     def is_cache_valid(self, timestamp: float) -> bool:
         """Check if cached result is still valid"""
@@ -236,27 +251,27 @@ class DatabaseManager:
         param_count = 1
 
         if store_ids:
-            conditions.append(f"sd.store_id = ANY(${param_count})")
+            conditions.append("sd.store_id = ANY($" + str(param_count) + ")")
             params.append(store_ids)
             param_count += 1
 
         if product_ids:
-            conditions.append(f"sd.product_id = ANY(${param_count})")
+            conditions.append("sd.product_id = ANY($" + str(param_count) + ")")
             params.append(product_ids)
             param_count += 1
 
         if city_ids:
-            conditions.append(f"sd.city_id = ANY(${param_count})")
+            conditions.append("sd.city_id = ANY($" + str(param_count) + ")")
             params.append(city_ids)
             param_count += 1
 
         if start_date:
-            conditions.append(f"sd.sale_date >= ${param_count}")
+            conditions.append(f"sd.sale_date >= ${{param_count}}")
             params.append(start_date.date())
             param_count += 1
 
         if end_date:
-            conditions.append(f"sd.sale_date <= ${param_count}")
+            conditions.append(f"sd.sale_date <= ${{param_count}}")
             params.append(end_date.date())
             param_count += 1
 
@@ -294,16 +309,16 @@ class DatabaseManager:
         param_count = 1
 
         if store_ids:
-            conditions.append(f"spm.store_id = ANY(${param_count})")
+            conditions.append("spm.store_id = ANY($" + str(param_count) + ")")
             params.append(store_ids)
             param_count += 1
 
         if metric_date:
-            conditions.append(f"spm.metric_date >= ${param_count}")
+            conditions.append(f"spm.metric_date >= ${{param_count}}")
             params.append((metric_date - timedelta(days=date_range_days)).date())
             param_count += 1
 
-            conditions.append(f"spm.metric_date <= ${param_count}")
+            conditions.append(f"spm.metric_date <= ${{param_count}}")
             params.append(metric_date.date())
             param_count += 1
 
@@ -341,12 +356,14 @@ class DatabaseManager:
         param_count = 3
 
         if store_id:
-            query += f" AND (pc.store_id = ${param_count} OR pc.store_id IS NULL)"
+            query += (
+                " AND (pc.store_id = $" + str(param_count) + " OR pc.store_id IS NULL)"
+            )
             params.append(store_id)
             param_count += 1
 
         if correlation_types:
-            query += f" AND pc.correlation_type = ANY(${param_count})"
+            query += " AND pc.correlation_type = ANY($" + str(param_count) + ")"
             params.append(correlation_types)
             param_count += 1
 
@@ -400,12 +417,12 @@ class DatabaseManager:
         param_count = 1
 
         if product_ids:
-            conditions.append(f"wia.product_id = ANY(${param_count})")
+            conditions.append("wia.product_id = ANY($" + str(param_count) + ")")
             params.append(product_ids)
             param_count += 1
 
         if city_ids:
-            conditions.append(f"wia.city_id = ANY(${param_count})")
+            conditions.append("wia.city_id = ANY($" + str(param_count) + ")")
             params.append(city_ids)
             param_count += 1
 
@@ -457,27 +474,27 @@ class DatabaseManager:
         param_count = 1
 
         if store_ids:
-            conditions.append(f"se.store_id = ANY(${param_count})")
+            conditions.append("se.store_id = ANY($" + str(param_count) + ")")
             params.append(store_ids)
             param_count += 1
 
         if product_ids:
-            conditions.append(f"se.product_id = ANY(${param_count})")
+            conditions.append("se.product_id = ANY($" + str(param_count) + ")")
             params.append(product_ids)
             param_count += 1
 
         if start_date:
-            conditions.append(f"se.stockout_start >= ${param_count}")
+            conditions.append(f"se.stockout_start >= ${{param_count}}")
             params.append(start_date)
             param_count += 1
 
         if end_date:
-            conditions.append(f"se.stockout_start <= ${param_count}")
+            conditions.append(f"se.stockout_start <= ${{param_count}}")
             params.append(end_date)
             param_count += 1
 
         if min_duration_hours:
-            conditions.append(f"se.duration_hours >= ${param_count}")
+            conditions.append(f"se.duration_hours >= ${{param_count}}")
             params.append(min_duration_hours)
             param_count += 1
 
@@ -518,27 +535,27 @@ class DatabaseManager:
         param_count = 1
 
         if store_ids:
-            conditions.append(f"pe.store_id = ANY(${param_count})")
+            conditions.append("pe.store_id = ANY($" + str(param_count) + ")")
             params.append(store_ids)
             param_count += 1
 
         if product_ids:
-            conditions.append(f"pe.product_id = ANY(${param_count})")
+            conditions.append("pe.product_id = ANY($" + str(param_count) + ")")
             params.append(product_ids)
             param_count += 1
 
         if start_date:
-            conditions.append(f"pe.promotion_start_date >= ${param_count}")
+            conditions.append(f"pe.promotion_start_date >= ${{param_count}}")
             params.append(start_date.date())
             param_count += 1
 
         if end_date:
-            conditions.append(f"pe.promotion_end_date <= ${param_count}")
+            conditions.append(f"pe.promotion_end_date <= ${{param_count}}")
             params.append(end_date.date())
             param_count += 1
 
         if min_roi:
-            conditions.append(f"pe.roi >= ${param_count}")
+            conditions.append(f"pe.roi >= ${{param_count}}")
             params.append(min_roi)
             param_count += 1
 
@@ -711,21 +728,93 @@ class DatabaseManager:
 
         logger.info(f"Updated store performance metrics for {metric_date.date()}")
 
-    async def clear_cache(self):
+    def clear_cache(self):
         """Clear query cache"""
         self.query_cache.clear()
         logger.info("Query cache cleared")
 
+    async def execute_insert(
+        self, table_name: str, data: Dict[str, Any]
+    ) -> Dict[str, Any]:
+        """Executes an INSERT query and returns the inserted row."""
+        columns = ", ".join(data.keys())
+        placeholders = ", ".join(f"${i+1}" for i in range(len(data)))
+        query = (
+            f"INSERT INTO {table_name} ({columns}) VALUES ({placeholders}) RETURNING *"
+        )
+        values = list(data.values())
 
-# Global database manager instance
-db_manager = DatabaseManager()
+        async with self.get_connection() as conn:
+            result = await conn.fetchrow(query, *values)
+            return dict(result) if result else {}
+
+    async def execute_update(
+        self, table_name: str, data: Dict[str, Any], conditions: Dict[str, Any]
+    ) -> List[Dict[str, Any]]:
+        """Executes an UPDATE query and returns the updated rows."""
+        set_clauses = ", ".join(f"{col} = ${i+1}" for i, col in enumerate(data.keys()))
+        where_clauses = " AND ".join(
+            f"{col} = ${i+len(data)+1}" for i, col in enumerate(conditions.keys())
+        )
+        query = (
+            f"UPDATE {table_name} SET {set_clauses} WHERE {where_clauses} RETURNING *"
+        )
+        values = list(data.values()) + list(conditions.values())
+
+        async with self.get_connection() as conn:
+            results = await conn.fetch(query, *values)
+            return [dict(row) for row in results]
+
+    async def execute_delete(self, table_name: str, conditions: Dict[str, Any]) -> int:
+        """Executes a DELETE query and returns the number of deleted rows."""
+        where_clauses = " AND ".join(
+            f"{col} = ${i+1}" for i, col in enumerate(conditions.keys())
+        )
+        query = f"DELETE FROM {table_name} WHERE {where_clauses}"
+        values = list(conditions.values())
+
+        async with self.get_connection() as conn:
+            status = await conn.execute(query, *values)
+            # The status string is typically 'DELETE N' where N is the number of rows.
+            return int(status.split(" ")[1]) if " " in status else 0
 
 
-async def get_pool():
-    """Get database connection pool"""
-    if not db_manager.pool:
-        await db_manager.initialize()
-    return db_manager.pool
+# Remove global db_manager instance, it will be managed by app.state
+# _db_manager_instance: Optional[DatabaseManager] = None
+
+# def get_db_manager() -> DatabaseManager:
+#     global _db_manager_instance
+#     if _db_manager_instance is None:
+#         _db_manager_instance = DatabaseManager()
+#     return _db_manager_instance
+
+# Remove get_pool and related legacy functions, manage pool directly via app.state.db_manager
+# async def get_pool():
+#     manager = get_db_manager()
+#     if not manager.pool:
+#         await manager.initialize()
+#     return manager.pool
+
+# def paginate(page: int = 1, page_size: int = 100):
+#     """Helper function for pagination"""
+#     offset = (page - 1) * page_size
+#     return f"LIMIT {page_size} OFFSET {offset}"
+
+# async def get_db_engine():
+#     return await get_db_manager()
+
+# async def get_supabase_client():
+#     return await get_db_engine()
+
+# async def get_db_connection():
+#     async with get_db_manager().get_connection() as conn:
+#         yield conn
+
+# async def initialize_database():
+#     await get_db_manager().initialize()
+
+# async def close_database():
+#     await get_db_manager().close()
 
 
 def cached(ttl: int = 300):
@@ -734,24 +823,145 @@ def cached(ttl: int = 300):
     def decorator(func):
         @wraps(func)
         async def wrapper(*args, **kwargs):
-            # Simple caching implementation
-            cache_key = f"{func.__name__}_{hash(str(args) + str(kwargs))}"
+            # Extract request object to get db_manager from app.state
+            request: Optional[Request] = None
+            for arg in args:
+                if isinstance(arg, Request):
+                    request = arg
+                    break
+            if "request" in kwargs and isinstance(kwargs["request"], Request):
+                request = kwargs["request"]
+
+            # If request is None (e.g., during startup, internal calls), bypass caching and proceed
+            if request is None:
+                logger.debug(
+                    f"Request object is None in @cached for {func.__name__}. Bypassing cache and directly executing function."
+                )
+                return await func(*args, **kwargs)
+
+            # Now that we know request is not None, we can safely access its attributes
+            # If it's not an HTTP request (e.g., ASGI lifespan, background task), bypass caching
             if (
-                hasattr(db_manager, "query_cache")
-                and cache_key in db_manager.query_cache
+                request.scope is None
+                or not hasattr(request.scope, "type")
+                or request.scope["type"] != "http"
             ):
-                cached_result, timestamp = db_manager.query_cache[cache_key]
-                if db_manager.is_cache_valid(timestamp):
-                    logger.info(f"Cache hit for function {func.__name__} with key: {cache_key}")
+                logger.debug(
+                    f"Bypassing cache for non-HTTP request (scope type is not 'http') to {func.__name__}"
+                )
+                return await func(*args, **kwargs)
+
+            # CRITICAL: Also bypass if db_manager is not yet available in app.state (e.g., during startup before app.on_event runs)
+            if (
+                not hasattr(request.app.state, "db_manager")
+                or request.app.state.db_manager is None
+            ):
+                logger.warning(
+                    f"db_manager not found or is None in app.state for {func.__name__}. Bypassing cache for this request."
+                )
+                return await func(*args, **kwargs)
+
+            manager = request.app.state.db_manager
+
+            # Convert args and kwargs to a JSON string for consistent hashing
+            def default_json_encoder(obj):
+                if isinstance(obj, datetime):
+                    return obj.isoformat()
+                if hasattr(obj, "model_dump"):  # Pydantic v2
+                    return obj.model_dump()
+                if hasattr(obj, "dict"):  # Pydantic v1
+                    return obj.dict()
+                # Handle Request object by ignoring it in cache key generation
+                if isinstance(obj, Request):
+                    return "_REQUEST_OBJECT_"  # Placeholder, will be consistent
+                # Ensure consistent order for lists and dictionary keys for hashing
+                if isinstance(obj, list):
+                    return sorted(obj, key=lambda x: str(x))  # Sort list elements
+                if isinstance(obj, dict):
+                    return {k: obj[k] for k in sorted(obj)}  # Sort dictionary keys
+                raise TypeError(
+                    f"Object of type {obj.__class__.__name__} is not JSON serializable"
+                )
+
+            try:
+                # Filter out the Request object from args/kwargs for caching purposes
+                filtered_args = [arg for arg in args if not isinstance(arg, Request)]
+                filtered_kwargs = {
+                    k: v for k, v in kwargs.items() if not isinstance(v, Request)
+                }
+
+                # Recursively sort lists and dictionary keys within filtered_args and filtered_kwargs
+                def deep_sort(item):
+                    if isinstance(item, dict):
+                        return {k: deep_sort(v) for k, v in sorted(item.items())}
+                    if isinstance(item, list):
+                        # Attempt to sort list items, handling non-comparable types
+                        try:
+                            return sorted(item, key=lambda x: str(deep_sort(x)))
+                        except TypeError:
+                            return item  # Cannot sort, return as is
+                    return item
+
+                cache_input = {
+                    "args": deep_sort(filtered_args),
+                    "kwargs": deep_sort(filtered_kwargs),
+                }
+
+                cache_key_str = json.dumps(
+                    cache_input, sort_keys=True, default=default_json_encoder
+                )
+                logger.debug(f"Generated raw cache key string: {cache_key_str}")
+                # Use SHA256 for consistent hashing across runs
+                cache_key = f"{func.__name__}_{hashlib.sha256(cache_key_str.encode()).hexdigest()}"
+            except TypeError as e:
+                logger.warning(
+                    f"Could not serialize function arguments for caching: {e}. Falling back to basic hashing."
+                )
+                # Fallback remains, though should be rarely hit now
+                cache_key = f"{func.__name__}_{hash(str(args) + str(kwargs))}"
+
+            logger.debug(
+                f"Generated function cache key for {func.__name__} with args: {args}, kwargs: {kwargs} -> {cache_key}"
+            )
+            logger.debug(
+                f"Current query_cache size: {len(manager.query_cache)}. query_cache ID: {id(manager.query_cache)}"
+            )
+
+            if hasattr(manager, "query_cache") and cache_key in manager.query_cache:
+                cached_result, timestamp = manager.query_cache[cache_key]
+                if (time.time() - timestamp) < ttl:
+                    logger.info(
+                        f"Cache hit for function {func.__name__} with key: {cache_key}"
+                    )
                     return cached_result
                 else:
-                    logger.info(f"Cache expired for function {func.__name__}. Cache miss with key: {cache_key}")
+                    logger.info(
+                        f"Cache expired for function {func.__name__}. Cache miss with key: {cache_key}"
+                    )
+                    logger.debug(
+                        f"Cache content for expired key: {manager.query_cache.get(cache_key)}"
+                    )
             else:
-                logger.info(f"Cache miss for function {func.__name__} with key: {cache_key}")
+                logger.info(
+                    f"Cache miss for function {func.__name__} with key: {cache_key}"
+                )
 
             result = await func(*args, **kwargs)
-            if hasattr(db_manager, "query_cache"):
-                db_manager.query_cache[cache_key] = (result, time.time())
+            if hasattr(manager, "query_cache"):
+                # Manage cache size before adding new item
+                if len(manager.query_cache) >= manager.max_cache_size:
+                    oldest_key = min(
+                        manager.query_cache.keys(),
+                        key=lambda k: manager.query_cache[k][1],
+                    )
+                    logger.debug(
+                        f"Cache max size reached. Removing oldest entry: {oldest_key}"
+                    )
+                    del manager.query_cache[oldest_key]
+                manager.query_cache[cache_key] = (result, time.time())
+                logger.debug(
+                    f"Added to cache. New cache size: {len(manager.query_cache)}"
+                )
             return result
 
         return wrapper
@@ -759,55 +969,8 @@ def cached(ttl: int = 300):
     return decorator
 
 
-def paginate(page: int = 1, page_size: int = 100):
-    """Helper function for pagination"""
-    offset = (page - 1) * page_size
-    return f"LIMIT {page_size} OFFSET {offset}"
-
-
-# Convenience functions for backward compatibility
-async def get_db_engine():
-    """Legacy function - returns database manager"""
-    if not db_manager.pool:
-        await db_manager.initialize()
-    return db_manager
-
-
-async def get_supabase_client():
-    """Legacy function - returns database manager"""
-    return await get_db_engine()
-
-
-# Context manager for database operations
-@asynccontextmanager
-async def get_db_connection():
-    """Get database connection context manager"""
-    async with db_manager.get_connection() as conn:
-        yield conn
-
-
-# Initialization function
-async def initialize_database():
-    """Initialize database connection pool"""
-    await db_manager.initialize()
-
-
-# Cleanup function
-async def close_database():
-    """Close database connections"""
-    await db_manager.close()
-
-
 # Export main components
 __all__ = [
     "DatabaseManager",
-    "db_manager",
-    "get_pool",
     "cached",
-    "paginate",
-    "get_db_engine",
-    "get_supabase_client",
-    "get_db_connection",
-    "initialize_database",
-    "close_database",
 ]

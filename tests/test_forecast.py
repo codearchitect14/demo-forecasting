@@ -225,8 +225,17 @@ class TestDataFetchFunctions:
             {"ds": datetime(2023, 1, 2), "y": 110, "store_id": 1},
         ]
 
+        # Create a mock request object
+        mock_request = MagicMock()
+        mock_request.app.state.db_manager.get_connection.return_value.__aenter__.return_value = (
+            mock_conn
+        )
+
         result = await fetch_historical_data(
-            store_id=1, start_date="2023-01-01", end_date="2023-01-02", conn=mock_conn
+            request=mock_request,
+            store_id=1,
+            start_date="2023-01-01",
+            end_date="2023-01-02",
         )
 
         assert isinstance(result, pd.DataFrame)
@@ -238,8 +247,17 @@ class TestDataFetchFunctions:
         mock_conn = AsyncMock()
         mock_conn.fetch.return_value = []
 
+        # Create a mock request object
+        mock_request_obj = MagicMock()
+        mock_request_obj.app.state.db_manager.get_connection.return_value.__aenter__.return_value = (
+            mock_conn
+        )
+
         result = await fetch_weather_data(
-            city_id=1, start_date="2024-01-01", end_date="2024-01-31", conn=mock_conn
+            request=mock_request_obj,
+            city_id=1,
+            start_date="2024-01-01",
+            end_date="2024-01-31",
         )
 
         assert isinstance(result, pd.DataFrame)
@@ -250,8 +268,17 @@ class TestDataFetchFunctions:
         mock_conn = AsyncMock()
         mock_conn.fetch.return_value = []
 
+        # Create a mock request object
+        mock_request_obj = MagicMock()
+        mock_request_obj.app.state.db_manager.get_connection.return_value.__aenter__.return_value = (
+            mock_conn
+        )
+
         result = await fetch_promotion_data(
-            store_id=1, start_date="2024-01-01", end_date="2024-01-31", conn=mock_conn
+            request=mock_request_obj,
+            store_id=1,
+            start_date="2024-01-01",
+            end_date="2024-01-31",
         )
 
         assert isinstance(result, pd.DataFrame)
@@ -262,8 +289,14 @@ class TestDataFetchFunctions:
         mock_conn = AsyncMock()
         mock_conn.fetch.return_value = []
 
+        # Create a mock request object
+        mock_request_obj = MagicMock()
+        mock_request_obj.app.state.db_manager.get_connection.return_value.__aenter__.return_value = (
+            mock_conn
+        )
+
         result = await fetch_holiday_data(
-            start_date="2024-01-01", end_date="2024-01-31", conn=mock_conn
+            request=mock_request_obj, start_date="2024-01-01", end_date="2024-01-31"
         )
 
         assert isinstance(result, pd.DataFrame)

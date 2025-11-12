@@ -10,21 +10,23 @@ import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
 from typing import List, Dict, Any, Optional
-from fastapi import APIRouter, HTTPException
+from fastapi import APIRouter, HTTPException, Request
 from pydantic import BaseModel
 import json
-from database.connection import db_manager, cached
+from database.connection import cached
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.preprocessing import StandardScaler
 import logging
 
 logger = logging.getLogger(__name__)
 
+
 class ForecastModelManager:
     """
     Manages the loading and access of forecasting models (RandomForestRegressor, StandardScaler)
     Ensures models are loaded once and reused across requests.
     """
+
     def __init__(self):
         self.demand_model: Optional[RandomForestRegressor] = None
         self.demand_scaler: Optional[StandardScaler] = None
@@ -33,7 +35,7 @@ class ForecastModelManager:
 
     async def load_models(self):
         """
-        Placeholder for actual model loading logic. 
+        Placeholder for actual model loading logic.
         In a real scenario, models would be loaded from disk (e.g., .joblib files)
         or a model registry here.
         For this exercise, we'll initialize them with dummy data if not present
@@ -148,20 +150,21 @@ class DemandForecastResponse(BaseModel):
 
 
 @router.post("/demand-forecast")
-@cached(ttl=300) # Cache for 5 minutes
-async def demand_forecast(request: dict):
+@cached(ttl=300)  # Cache for 5 minutes
+async def demand_forecast(request_body: dict, request: Request):
     """
     Generate demand forecasts with inventory management insights
     """
     try:
-        if not db_manager.pool:
-            await db_manager.initialize()
-        async with db_manager.get_connection() as conn:
+        manager = request.app.state.db_manager
+        if not manager.pool:
+            raise RuntimeError("Database pool not initialized. Check startup events.")
+        async with manager.get_connection() as conn:
 
-            city_ids = request.get("city_ids", [])
-            store_ids = request.get("store_ids", [])
-            product_ids = request.get("product_ids", [])
-            forecast_days = request.get("forecast_days", 30)
+            city_ids = request_body.get("city_ids", [])
+            store_ids = request_body.get("store_ids", [])
+            product_ids = request_body.get("product_ids", [])
+            forecast_days = request_body.get("forecast_days", 30)
 
             # Get current inventory status
             inventory_status = await get_inventory_status(
@@ -187,6 +190,24 @@ async def demand_forecast(request: dict):
             inventory_recommendations = generate_inventory_recommendations(
                 inventory_status, demand_forecasts, stockout_risk_analysis
             )
+
+            # --- WebSocket Notification ---
+            try:
+                websocket_manager = getattr(
+                    request.app.state, "websocket_manager", None
+                )
+                if websocket_manager:
+                    # Compose a useful demand/stockout notification
+                    if demand_insights:
+                        top_alert = demand_insights[0]
+                        msg = f"Alert for Demand Forecast: {top_alert.urgency_level.upper()} - {top_alert.product_name} in {top_alert.location} ({top_alert.store_name}): {top_alert.recommended_action}"
+                    elif inventory_status:
+                        msg = f"Demand Forecast: {len(inventory_status)} products analyzed."
+                    else:
+                        msg = "Demand Forecast: No insights available."
+                    await websocket_manager.broadcast(msg)
+            except Exception as ws_exc:
+                logger.warning(f"WebSocket notification failed: {ws_exc}")
 
             return DemandForecastResponse(
                 success=True,
@@ -262,9 +283,9 @@ async def get_inventory_status(
                             product_name=location_info.get(
                                 "product_name", f"Product {product_id}"
                             ),
-                            city_id=city_id,
+                            city_id=str(city_id),
                             city_name=location_info.get("city_name", f"City {city_id}"),
-                            store_id=store_id,
+                            store_id=str(store_id),
                             store_name=location_info.get(
                                 "store_name", f"Store {store_id}"
                             ),
@@ -815,14 +836,14 @@ async def generate_demand_forecast_single(
         model = model_manager.demand_model
         scaler = model_manager.demand_scaler
 
-        if model is None or scaler is None: # Fallback if models failed to load
+        if model is None or scaler is None:  # Fallback if models failed to load
             logger.warning("Demand models not loaded, generating fallback forecast.")
             return generate_fallback_demand_forecast(forecast_days)
 
         X = features.drop(["estimated_units_sold"], axis=1)
         y = features["estimated_units_sold"]
 
-        # Fit scaler and model only if new data requires re-training, 
+        # Fit scaler and model only if new data requires re-training,
         # or if it's the first time and model needs a fit for prediction
         # In a real system, you'd load pre-trained models.
         X_scaled = scaler.fit_transform(X)
@@ -1356,24 +1377,29 @@ def generate_inventory_recommendations(
         # --- NEW: Supplier management per product/store with high lead time or frequent stockouts ---
         # For demo, assume high lead time if days_until_stockout < 7 and stockout_frequency > 0.3
         supplier_issues = [
-            item for item in inventory_status if (getattr(item, 'supplier_lead_time', 0) and item.supplier_lead_time > 7) or item.stockout_frequency > 0.3
+            item
+            for item in inventory_status
+            if (getattr(item, "supplier_lead_time", 0) and item.supplier_lead_time > 7)
+            or item.stockout_frequency > 0.3
         ]
         for item in supplier_issues:
-            recommendations.append({
-                "type": "supplier_management",
-                "priority": "medium",
-                "title": f"Supplier Optimization for {item.product_name} ({item.store_name})",
-                "description": f"Improve supplier performance for {item.product_name} in {item.store_name} (lead time: {getattr(item, 'supplier_lead_time', 'N/A')} days, stockout freq: {item.stockout_frequency:.2f})",
-                "action_items": [
-                    f"Negotiate shorter lead times for {item.product_name}",
-                    f"Establish backup suppliers for {item.product_name} in {item.store_name}",
-                    f"Implement vendor-managed inventory for {item.product_name}",
-                    f"Monitor supplier performance for {item.product_name}"
-                ],
-                "estimated_impact": int(item.avg_daily_demand * 30 * 2),
-                "affected_products": [item.product_name],
-                "affected_stores": [item.store_name],
-            })
+            recommendations.append(
+                {
+                    "type": "supplier_management",
+                    "priority": "medium",
+                    "title": f"Supplier Optimization for {item.product_name} ({item.store_name})",
+                    "description": f"Improve supplier performance for {item.product_name} in {item.store_name} (lead time: {getattr(item, 'supplier_lead_time', 'N/A')} days, stockout freq: {item.stockout_frequency:.2f})",
+                    "action_items": [
+                        f"Negotiate shorter lead times for {item.product_name}",
+                        f"Establish backup suppliers for {item.product_name} in {item.store_name}",
+                        f"Implement vendor-managed inventory for {item.product_name}",
+                        f"Monitor supplier performance for {item.product_name}",
+                    ],
+                    "estimated_impact": int(item.avg_daily_demand * 30 * 2),
+                    "affected_products": [item.product_name],
+                    "affected_stores": [item.store_name],
+                }
+            )
 
         # Demand forecasting improvements
         recommendations.append(
@@ -1410,7 +1436,9 @@ def generate_inventory_recommendations(
                 "estimated_impact": sum(
                     item.recommended_reorder_quantity * 2 for item in inventory_status
                 ),
-                "affected_products": list({item.product_name for item in inventory_status}),
+                "affected_products": list(
+                    {item.product_name for item in inventory_status}
+                ),
                 "affected_stores": list({item.store_name for item in inventory_status}),
             }
         )
@@ -1423,25 +1451,26 @@ def generate_inventory_recommendations(
 
 
 @router.post("/valid-products")
-async def get_valid_products(request: dict):
+async def get_valid_products(request_body: dict, request: Request):
     """
     Get products that have sales data for the selected cities and stores
     """
     try:
-        if not db_manager.pool:
-            await db_manager.initialize()
-        async with db_manager.get_connection() as conn:
+        manager = request.app.state.db_manager
+        if not manager.pool:
+            raise RuntimeError("Database pool not initialized. Check startup events.")
+        async with manager.get_connection() as conn:
 
-            city_ids = request.get("city_ids", [])
-            store_ids = request.get("store_ids", [])
+            city_ids = request_body.get("city_ids", [])
+            store_ids = request_body.get("store_ids", [])
 
             # Build query based on selections
             where_conditions = []
             if city_ids:
-                city_list = "','".join(city_ids)
+                city_list = "','".join(str(cid) for cid in city_ids)
                 where_conditions.append(f"sd.city_id IN ('{city_list}')")
             if store_ids:
-                store_list = "','".join(store_ids)
+                store_list = "','".join(str(sid) for sid in store_ids)
                 where_conditions.append(f"sd.store_id IN ('{store_list}')")
 
             where_clause = " AND ".join(where_conditions) if where_conditions else "1=1"
@@ -1558,49 +1587,70 @@ async def get_diverse_store_selection(
 @router.post(
     "/multi-dimensional-forecast", response_model=MultiDimensionalForecastResponse
 )
-@cached(ttl=300) # Cache for 5 minutes
-async def multi_dimensional_forecast(request: MultiDimensionalForecastRequest):
+@cached(ttl=300)  # Cache for 5 minutes
+async def multi_dimensional_forecast(
+    request_body: MultiDimensionalForecastRequest, request: Request
+):
     """
     Generate multi-dimensional forecasts with comparative analysis and insights
     """
     try:
-        if not db_manager.pool:
-            await db_manager.initialize()
-        async with db_manager.get_connection() as conn:
+        manager = request.app.state.db_manager
+        if not manager.pool:
+            raise RuntimeError("Database pool not initialized. Check startup events.")
+        async with manager.get_connection() as conn:
             # Get diverse store selection if needed
             diverse_store_ids = await get_diverse_store_selection(
-                conn, request.city_ids, request.store_ids
+                conn, request_body.city_ids, request_body.store_ids
             )
 
             # Get data for all combinations
             forecast_results = await generate_multi_dimensional_forecast(
                 conn,
-                request.city_ids,
+                request_body.city_ids,
                 diverse_store_ids,
-                request.product_ids,
-                request.forecast_days,
+                request_body.product_ids,
+                request_body.forecast_days,
             )
 
             # Generate insights
             insights = await generate_forecast_insights(
                 conn,
                 forecast_results,
-                request.city_ids,
-                request.store_ids,
-                request.product_ids,
+                request_body.city_ids,
+                request_body.store_ids,
+                request_body.product_ids,
             )
 
             # Generate comparative analysis
             comparative_analysis = await generate_comparative_analysis(
                 conn,
                 forecast_results,
-                request.city_ids,
-                request.store_ids,
-                request.product_ids,
+                request_body.city_ids,
+                request_body.store_ids,
+                request_body.product_ids,
             )
 
             # Generate summary
             summary = generate_forecast_summary(forecast_results, insights)
+
+            # --- WebSocket Notification ---
+            try:
+                websocket_manager = getattr(
+                    request.app.state, "websocket_manager", None
+                )
+                if websocket_manager:
+                    # Compose a useful sales forecast notification
+                    if insights:
+                        top_insight = insights[0]
+                        msg = f"Insight for Sales Forecast: {top_insight.product_name} in {top_insight.location} ({top_insight.store_name}): {top_insight.recommendation} (Growth: {top_insight.growth_rate:.1f}%, Confidence: {top_insight.confidence_score:.1f}%)"
+                    elif summary and summary.get("total_combinations", 0) > 0:
+                        msg = f"Sales Forecast: {summary['total_combinations']} combinations analyzed."
+                    else:
+                        msg = "Sales Forecast: No insights available."
+                    await websocket_manager.broadcast(msg)
+            except Exception as ws_exc:
+                logger.warning(f"WebSocket notification failed: {ws_exc}")
 
             return MultiDimensionalForecastResponse(
                 success=True,
@@ -1762,7 +1812,7 @@ async def generate_single_forecast(
         model = model_manager.sales_model
         scaler = model_manager.sales_scaler
 
-        if model is None or scaler is None: # Fallback if models failed to load
+        if model is None or scaler is None:  # Fallback if models failed to load
             logger.warning("Sales models not loaded, generating fallback forecast.")
             return generate_fallback_forecast(forecast_days)
 
@@ -2430,14 +2480,15 @@ def generate_forecast_summary(
 
 
 @router.get("/weather-holiday-data")
-async def get_weather_holiday_data():
+async def get_weather_holiday_data(request: Request):  # Accept Request object
     """
     Explore weather and holiday data patterns in the database
     """
     try:
-        if not db_manager.pool:
-            await db_manager.initialize()
-        async with db_manager.get_connection() as conn:
+        manager = request.app.state.db_manager  # Access from app.state
+        if not manager.pool:
+            raise RuntimeError("Database pool not initialized. Check startup events.")
+        async with manager.get_connection() as conn:
 
             # Check weather data ranges
             weather_query = f"""
@@ -2603,28 +2654,26 @@ async def weather_api_status():
 
 
 @router.post("/weather-holiday-forecast")
-@cached(ttl=300) # Cache for 5 minutes
-async def weather_holiday_forecast(request: dict):
+@cached(ttl=300)  # Cache for 5 minutes
+async def weather_holiday_forecast(request_body: dict, request: Request):
     """
     Advanced weather and holiday-based forecasting with real-time recommendations
     """
     try:
-        if not db_manager.pool:
-            await db_manager.initialize()
-        async with db_manager.get_connection() as conn:
+        manager = request.app.state.db_manager
+        if not manager.pool:
+            raise RuntimeError("Database pool not initialized. Check startup events.")
+        async with manager.get_connection() as conn:
+            city_ids = request_body.get("city_ids", [])
+            store_ids = request_body.get("store_ids", [])
+            product_ids = request_body.get("product_ids", [])
+            discount_percentage = request_body.get("discount_percentage", 5)
+            promotion_duration = request_body.get("promotion_duration_days", 7)
 
-            city_ids = request.get("city_ids", [])
-            store_ids = request.get("store_ids", [])
-            product_ids = request.get("product_ids", [])
-            discount_percentage = request.get("discount_percentage", 0.0)
-            promotion_duration = request.get("promotion_duration_days", 7)
-
-            # Get current weather conditions for each city
             current_weather_recommendations = await generate_weather_recommendations(
                 conn, city_ids, store_ids, product_ids
             )
 
-            # Analyze promotional impact with weather and holiday factors
             promotional_analysis = await analyze_promotional_impact(
                 conn,
                 city_ids,
@@ -2634,25 +2683,40 @@ async def weather_holiday_forecast(request: dict):
                 promotion_duration,
             )
 
-            # Generate weather impact summary
             weather_impact_summary = await generate_weather_impact_summary(
                 conn, city_ids, store_ids, product_ids
             )
 
-            # Generate holiday impact summary
             holiday_impact_summary = await generate_holiday_impact_summary(
                 conn, city_ids, store_ids, product_ids
             )
 
-            # Generate bundle recommendations based on weather patterns
             bundle_recommendations = await generate_weather_bundle_recommendations(
                 conn, city_ids, store_ids, product_ids
             )
 
-            # Generate seasonal insights
             seasonal_insights = await generate_seasonal_insights(
                 conn, city_ids, store_ids, product_ids
             )
+
+            # --- WebSocket Notification ---
+            try:
+                websocket_manager = getattr(
+                    request.app.state, "websocket_manager", None
+                )
+                if websocket_manager:
+                    # Compose a useful weather/promotional notification
+                    if promotional_analysis:
+                        top_promo = promotional_analysis[0]
+                        msg = f"Weather/Promo Insight: {top_promo.product_name} in {top_promo.city_name} ({top_promo.store_name}): {top_promo.recommendation} (Uplift: {top_promo.expected_sales_increase*100:.1f}%, Revenue: ${top_promo.expected_revenue_impact:.2f})"
+                    elif current_weather_recommendations:
+                        top_weather = current_weather_recommendations[0]
+                        msg = f"Weather Impact: {top_weather.product_name} in {top_weather.city_name} ({top_weather.store_name}): {top_weather.reasoning}"
+                    else:
+                        msg = "Weather/Holiday Forecast: No insights available."
+                    await websocket_manager.broadcast(msg)
+            except Exception as ws_exc:
+                logger.warning(f"WebSocket notification failed: {ws_exc}")
 
             return WeatherHolidayForecastResponse(
                 success=True,
@@ -3018,9 +3082,9 @@ async def generate_weather_recommendation_for_product(
         return WeatherRecommendation(
             product_id=product_id,
             product_name=location_info.get("product_name", f"Product {product_id}"),
-            city_id=location_info.get("city_id", "0"),
+            city_id=str(location_info.get("city_id", "0")),
             city_name=location_info.get("city_name", "Unknown City"),
-            store_id=location_info.get("store_id", "0"),
+            store_id=str(location_info.get("store_id", "0")),
             store_name=location_info.get("store_name", "Unknown Store"),
             current_weather=current_weather,
             recommendation_type=recommendation_type,
@@ -3035,9 +3099,9 @@ async def generate_weather_recommendation_for_product(
         return WeatherRecommendation(
             product_id=product_id,
             product_name=location_info.get("product_name", f"Product {product_id}"),
-            city_id=location_info.get("city_id", "0"),
+            city_id=str(location_info.get("city_id", "0")),
             city_name=location_info.get("city_name", "Unknown City"),
-            store_id=location_info.get("store_id", "0"),
+            store_id=str(location_info.get("store_id", "0")),
             store_name=location_info.get("store_name", "Unknown Store"),
             current_weather=current_weather,
             recommendation_type="normal",
@@ -3181,9 +3245,9 @@ async def analyze_promotional_impact(
                             product_name=location_info.get(
                                 "product_name", f"Product {product_id}"
                             ),
-                            city_id=city_id,
+                            city_id=str(city_id),
                             city_name=location_info.get("city_name", "Unknown City"),
-                            store_id=store_id,
+                            store_id=str(store_id),
                             store_name=location_info.get("store_name", "Unknown Store"),
                             discount_percentage=discount_percentage,
                             promotion_duration_days=promotion_duration,

@@ -3,3 +3,7 @@ __pycache__/
 .env
 *.sqlite
 .ipynb_checkpoints/
+venv/
+data_export/*.csv
+data_export/**/*.csv
+data_export/*.zip

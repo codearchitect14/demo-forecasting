@@ -15,8 +15,9 @@ from scipy.stats import pearsonr, spearmanr
 from sklearn.cluster import KMeans
 from sklearn.preprocessing import StandardScaler
 import json
+from fastapi import Request  # Import Request
 
-from database.connection import get_db_connection
+# from database.connection import get_db_connection # Removed
 from utils.logger import get_logger
 
 logger = get_logger(__name__)
@@ -73,15 +74,26 @@ class PortfolioAnalysisService:
         }
 
     async def analyze_product_portfolio(
-        self, store_id: Optional[int] = None, city_id: Optional[int] = None
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        city_id: Optional[int] = None,  # Add request
     ) -> Dict[str, Any]:
         """Comprehensive portfolio analysis across multiple dimensions."""
         try:
             # Run parallel analysis tasks
-            correlation_task = self._analyze_product_correlations(store_id, city_id)
-            bundle_task = self._identify_bundle_opportunities(store_id, city_id)
-            category_task = self._analyze_category_portfolio(store_id, city_id)
-            performance_task = self._analyze_product_performance(store_id, city_id)
+            correlation_task = self._analyze_product_correlations(
+                request, store_id, city_id
+            )  # Pass request
+            bundle_task = self._identify_bundle_opportunities(
+                request, store_id, city_id
+            )  # Pass request
+            category_task = self._analyze_category_portfolio(
+                request, store_id, city_id
+            )  # Pass request
+            performance_task = self._analyze_product_performance(
+                request, store_id, city_id
+            )  # Pass request
 
             correlations, bundles, categories, performance = await asyncio.gather(
                 correlation_task, bundle_task, category_task, performance_task
@@ -94,7 +106,13 @@ class PortfolioAnalysisService:
 
             # Store analysis results
             await self._store_portfolio_analysis(
-                store_id, city_id, correlations, bundles, categories, insights
+                request,
+                store_id,
+                city_id,
+                correlations,
+                bundles,
+                categories,
+                insights,  # Pass request
             )
 
             return {
@@ -111,11 +129,15 @@ class PortfolioAnalysisService:
             raise
 
     async def _analyze_product_correlations(
-        self, store_id: Optional[int] = None, city_id: Optional[int] = None
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        city_id: Optional[int] = None,  # Add request
     ) -> List[ProductCorrelation]:
         """Analyze correlations between different products."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 # Get sales data for correlation analysis
                 query = """
                 SELECT 
@@ -207,18 +229,24 @@ class PortfolioAnalysisService:
             return []
 
     async def _identify_bundle_opportunities(
-        self, store_id: Optional[int] = None, city_id: Optional[int] = None
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        city_id: Optional[int] = None,  # Add request
     ) -> List[BundleOpportunity]:
         """Identify optimal product bundling opportunities."""
         try:
             # Get product correlations first
-            correlations = await self._analyze_product_correlations(store_id, city_id)
+            correlations = await self._analyze_product_correlations(
+                request, store_id, city_id
+            )  # Pass request
 
             if not correlations:
                 return []
 
             # Get product details and pricing
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 SELECT 
                     s.product_id,
@@ -404,11 +432,15 @@ class PortfolioAnalysisService:
             return []
 
     async def _analyze_category_portfolio(
-        self, store_id: Optional[int] = None, city_id: Optional[int] = None
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        city_id: Optional[int] = None,  # Add request
     ) -> List[CategoryPortfolio]:
         """Analyze performance across product categories."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 WITH category_metrics AS (
                     SELECT 
@@ -522,11 +554,15 @@ class PortfolioAnalysisService:
             return []
 
     async def _analyze_product_performance(
-        self, store_id: Optional[int] = None, city_id: Optional[int] = None
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        city_id: Optional[int] = None,  # Add request
     ) -> Dict[str, Any]:
         """Analyze individual product performance metrics."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 query = """
                 WITH product_performance AS (
                     SELECT 
@@ -785,6 +821,7 @@ class PortfolioAnalysisService:
 
     async def _store_portfolio_analysis(
         self,
+        request: Request,  # Add request
         store_id: Optional[int],
         city_id: Optional[int],
         correlations: List[ProductCorrelation],
@@ -794,7 +831,8 @@ class PortfolioAnalysisService:
     ) -> None:
         """Store portfolio analysis results in database."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 # Store main portfolio analysis record
                 portfolio_type = (
                     "store" if store_id else "city" if city_id else "global"
@@ -860,10 +898,13 @@ class PortfolioAnalysisService:
         except Exception as e:
             self.logger.error(f"Error storing portfolio analysis: {e}")
 
-    async def get_bundle_performance_tracking(self, bundle_id: str) -> Dict[str, Any]:
+    async def get_bundle_performance_tracking(
+        self, request: Request, bundle_id: str
+    ) -> Dict[str, Any]:  # Add request
         """Track performance of implemented bundles."""
         try:
-            async with get_db_connection() as conn:
+            manager = request.app.state.db_manager
+            async with manager.get_connection() as conn:  # Use manager.get_connection
                 # In a real system, this would track actual bundle sales
                 # For now, simulate bundle performance tracking
 
@@ -895,14 +936,16 @@ class PortfolioAnalysisService:
             return {}
 
     async def get_portfolio_optimization_recommendations(
-        self, city_id: int
+        self, request: Request, city_id: int  # Add request
     ) -> List[Dict[str, Any]]:
         """Get optimization recommendations for entire portfolio."""
         try:
             recommendations = []
 
             # Get latest portfolio analysis
-            portfolio_analysis = await self.analyze_product_portfolio(city_id=city_id)
+            portfolio_analysis = await self.analyze_product_portfolio(
+                request, city_id=city_id
+            )  # Pass request
 
             if portfolio_analysis.get("bundle_opportunities"):
                 # Recommend top bundles

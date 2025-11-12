@@ -3,16 +3,60 @@ Main application entry point.
 """
 
 import os
-from fastapi import FastAPI
+from fastapi import FastAPI, WebSocket, WebSocketDisconnect
 from fastapi.staticfiles import StaticFiles
 from fastapi.responses import FileResponse
+from fastapi.middleware.cors import CORSMiddleware  # Import CORSMiddleware
 from app.api import app as api_app
 from dotenv import load_dotenv
-from database.connection import db_manager
+from database.connection import DatabaseManager  # Import DatabaseManager class directly
+import logging  # Import logging
 
 load_dotenv()
 
+# Configure logging
+logging.basicConfig(level=logging.INFO)
+logger = logging.getLogger(__name__)
+
+
+# Connection Manager for WebSockets
+class ConnectionManager:
+    def __init__(self):
+        self.active_connections: list[WebSocket] = []
+
+    async def connect(self, websocket: WebSocket):
+        await websocket.accept()
+        self.active_connections.append(websocket)
+        logger.info(f"WebSocket connected: {websocket.client}")
+
+    def disconnect(self, websocket: WebSocket):
+        self.active_connections.remove(websocket)
+        logger.info(f"WebSocket disconnected: {websocket.client}")
+
+    async def send_personal_message(self, message: str, websocket: WebSocket):
+        await websocket.send_text(message)
+
+    async def broadcast(self, message: str):
+        for connection in self.active_connections:
+            try:
+                await connection.send_text(message)
+            except RuntimeError as e:
+                logger.error(
+                    f"Error sending message to WebSocket {connection.client}: {e}"
+                )
+                self.active_connections.remove(connection)  # Remove broken connection
+
+
 app = FastAPI()
+
+# Add CORS middleware
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=["*"],
+    allow_credentials=True,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 
 # Mount static files
 app.mount("/static", StaticFiles(directory="static"), name="static")
@@ -42,8 +86,42 @@ def enhanced_multi_dimensional():
     return FileResponse("static/enhanced_multi_dimensional.html")
 
 
+# WebSocket endpoint for real-time notifications
+@app.websocket("/ws")
+async def websocket_endpoint(websocket: WebSocket):
+    await app.state.websocket_manager.connect(websocket)
+    try:
+        while True:
+            # Keep connection alive, or handle incoming messages if needed
+            await websocket.receive_text()
+    except WebSocketDisconnect:
+        app.state.websocket_manager.disconnect(websocket)
+    except Exception as e:
+        logger.error(f"WebSocket error: {e}")
+        app.state.websocket_manager.disconnect(websocket)
+
+
 # Mount the API under /api
-app.mount("/api", api_app)
+# app.mount("/api", api_app) # Removed app.mount
+app.include_router(
+    api_app, prefix="/api"
+)  # Use include_router instead to share app.state
+
+
+# Add startup and shutdown events
+@app.on_event("startup")
+async def startup_event():
+    app.state.db_manager = DatabaseManager()  # Instantiate DatabaseManager directly
+    await app.state.db_manager.initialize()
+    app.state.websocket_manager = (
+        ConnectionManager()
+    )  # Instantiate WebSocket ConnectionManager
+
+
+@app.on_event("shutdown")
+async def shutdown_event():
+    await app.state.db_manager.close()
+
 
 # Add enhanced endpoints directly to main app
 try:
@@ -74,7 +152,8 @@ async def debug_data():
         ORDER BY record_count DESC
         LIMIT 10
         """
-        async with db_manager.get_connection() as conn:
+        # Access db_manager from app.state
+        async with app.state.db_manager.get_connection() as conn:
             records = await conn.fetch(query)
         return {
             "available_combinations": [
@@ -94,4 +173,4 @@ async def debug_data():
 if __name__ == "__main__":
     import uvicorn
 
-    uvicorn.run("app.main:app", host="0.0.0.0", port=8000, reload=True)
+    uvicorn.run("app.main:app", host="0.0.0.0", port=8000)

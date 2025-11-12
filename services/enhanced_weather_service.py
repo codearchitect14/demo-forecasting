@@ -17,11 +17,12 @@ from sklearn.preprocessing import StandardScaler
 from sklearn.ensemble import RandomForestRegressor
 from sklearn.metrics import mean_absolute_error, r2_score
 import warnings
+from fastapi import Request  # Import Request
 
 warnings.filterwarnings("ignore")
 
 # Import database manager
-from database.connection import db_manager
+# from database.connection import db_manager # Removed
 
 logger = logging.getLogger(__name__)
 
@@ -74,16 +75,14 @@ class WeatherImpactResult:
 
 
 class EnhancedWeatherService:
-    """
-    Enhanced weather-sensitive demand modeling service
-    """
+    """Enhanced weather-sensitive demand modeling service"""
 
     def __init__(self):
         self.scaler = StandardScaler()
         self.weather_models: Dict[str, Any] = {}
 
     async def analyze_weather_impact(
-        self, request: WeatherImpactRequest
+        self, request_data: WeatherImpactRequest, request: Request  # Add request
     ) -> WeatherImpactResult:
         """
         Comprehensive weather impact analysis
@@ -94,43 +93,49 @@ class EnhancedWeatherService:
         Returns:
             WeatherImpactResult with comprehensive analysis
         """
-        logger.info(f"Analyzing weather impact for {len(request.product_ids)} products")
+        logger.info(
+            f"Analyzing weather impact for {len(request_data.product_ids)} products"
+        )
 
         # 1. Get comprehensive data
-        historical_data = await self._get_weather_sales_data(request)
+        historical_data = await self._get_weather_sales_data(
+            request_data, request
+        )  # Pass request
 
         if historical_data.empty:
             raise ValueError("No historical data available for weather analysis")
 
         # 2. Calculate weather correlations
         weather_correlations = await self._calculate_weather_correlations(
-            historical_data, request.weather_factors or [WeatherFactor.ALL]
+            historical_data,
+            request_data.weather_factors or [WeatherFactor.ALL],
+            request,  # Pass request
         )
 
         # 3. Perform product clustering by weather sensitivity
         product_clustering = None
-        if request.include_product_clustering:
+        if request_data.include_product_clustering:
             product_clustering = await self._cluster_products_by_weather_sensitivity(
-                historical_data, request.product_ids
+                historical_data, request_data.product_ids, request  # Pass request
             )
 
         # 4. Analyze seasonal patterns
         seasonal_patterns = None
-        if request.include_seasonal_analysis:
+        if request_data.include_seasonal_analysis:
             seasonal_patterns = await self._analyze_seasonal_weather_patterns(
-                historical_data, request.product_ids
+                historical_data, request_data.product_ids
             )
 
         # 5. Generate weather-based forecasts
         weather_forecasts = None
-        if request.include_forecasting:
+        if request_data.include_forecasting:
             weather_forecasts = await self._generate_weather_based_forecasts(
-                historical_data, request.forecast_horizon_days
+                historical_data, request_data.forecast_horizon_days
             )
 
         # 6. Calculate elasticity analysis
         elasticity_analysis = await self._calculate_weather_elasticity(
-            historical_data, request.product_ids
+            historical_data, request_data.product_ids
         )
 
         # 7. Generate optimization recommendations
@@ -151,18 +156,21 @@ class EnhancedWeatherService:
         )
 
     async def _get_weather_sales_data(
-        self, request: WeatherImpactRequest
+        self, request_data: WeatherImpactRequest, request: Request  # Add request
     ) -> pd.DataFrame:
         """Get comprehensive weather and sales data"""
 
         end_date = datetime.now()
-        start_date = end_date - timedelta(days=request.analysis_period_days)
+        start_date = end_date - timedelta(days=request_data.analysis_period_days)
+
+        # Access db_manager from app.state
+        manager = request.app.state.db_manager
 
         # Get sales data with weather information
-        sales_data = await db_manager.get_sales_data(
-            store_ids=request.store_ids,
-            product_ids=request.product_ids,
-            city_ids=request.city_ids,
+        sales_data = await manager.get_sales_data(  # Use manager.get_sales_data
+            store_ids=request_data.store_ids,
+            product_ids=request_data.product_ids,
+            city_ids=request_data.city_ids,
             start_date=start_date,
             end_date=end_date,
             include_hourly=False,
@@ -204,7 +212,10 @@ class EnhancedWeatherService:
         return sales_data
 
     async def _calculate_weather_correlations(
-        self, data: pd.DataFrame, weather_factors: List[WeatherFactor]
+        self,
+        data: pd.DataFrame,
+        weather_factors: List[WeatherFactor],
+        request: Request,  # Add request
     ) -> Dict[str, Any]:
         """Calculate weather-sales correlations"""
 
@@ -309,7 +320,10 @@ class EnhancedWeatherService:
         return correlations
 
     async def _cluster_products_by_weather_sensitivity(
-        self, data: pd.DataFrame, product_ids: List[int]
+        self,
+        data: pd.DataFrame,
+        product_ids: List[int],
+        request: Request,  # Add request
     ) -> Dict[str, Any]:
         """Cluster products by weather sensitivity patterns"""
 
@@ -464,11 +478,17 @@ class EnhancedWeatherService:
         }
 
     async def _analyze_seasonal_weather_patterns(
-        self, data: pd.DataFrame, product_ids: List[int]
+        self,
+        data: pd.DataFrame,
+        product_ids: List[int],
+        request: Request,  # Add request
     ) -> Dict[str, Any]:
         """Analyze seasonal weather-demand patterns"""
 
         seasonal_patterns = {}
+
+        # Access db_manager from app.state - NOTE: Not currently used in this function, but added for consistency if needed in future
+        # manager = request.app.state.db_manager
 
         for product_id in product_ids:
             product_data = data[data["product_id"] == product_id].copy()
@@ -544,11 +564,14 @@ class EnhancedWeatherService:
         return seasonal_patterns
 
     async def _generate_weather_based_forecasts(
-        self, data: pd.DataFrame, horizon_days: int
+        self, data: pd.DataFrame, horizon_days: int, request: Request  # Add request
     ) -> Dict[str, Any]:
         """Generate demand forecasts based on weather patterns"""
 
         forecasts = {}
+
+        # Access db_manager from app.state - NOTE: Not currently used in this function, but added for consistency if needed in future
+        # manager = request.app.state.db_manager
 
         # Prepare weather features
         weather_features = [
@@ -632,7 +655,10 @@ class EnhancedWeatherService:
         return forecasts
 
     async def _calculate_weather_elasticity(
-        self, data: pd.DataFrame, product_ids: List[int]
+        self,
+        data: pd.DataFrame,
+        product_ids: List[int],
+        request: Request,  # Add request
     ) -> Dict[str, Any]:
         """Calculate weather elasticity for demand optimization"""
 
@@ -1068,17 +1094,18 @@ class EnhancedWeatherService:
                     f"{cold_impact:.1f}% change in sales"
                 )
 
-        if "precpt" in data.columns:
-            heavy_rain = data[data["precpt"] > data["precpt"].quantile(0.9)]
-            no_rain = data[data["precpt"] == 0]
+            if "precpt" in data.columns:
+                heavy_rain = data[data["precpt"] > data["precpt"].quantile(0.9)]
+                no_rain = data[data["precpt"] == 0]
 
-            if len(heavy_rain) > 0 and len(no_rain) > 0:
-                rain_impact = (
-                    heavy_rain["sale_amount"].mean() / no_rain["sale_amount"].mean() - 1
-                ) * 100
-                extreme_impact["heavy_rain_impact"] = (
-                    f"{rain_impact:.1f}% change in sales"
-                )
+                if len(heavy_rain) > 0 and len(no_rain) > 0:
+                    rain_impact = (
+                        heavy_rain["sale_amount"].mean() / no_rain["sale_amount"].mean()
+                        - 1
+                    ) * 100
+                    extreme_impact["heavy_rain_impact"] = (
+                        f"{rain_impact:.1f}% change in sales"
+                    )
 
         return extreme_impact
 
@@ -1102,8 +1129,8 @@ class EnhancedWeatherService:
             return "inelastic"
 
 
-# Export the service
-enhanced_weather_service = EnhancedWeatherService()
+# Export the service - REMOVED GLOBAL INSTANTIATION
+# enhanced_weather_service = EnhancedWeatherService()
 
 __all__ = [
     "EnhancedWeatherService",
@@ -1111,5 +1138,5 @@ __all__ = [
     "WeatherImpactResult",
     "WeatherSensitivityLevel",
     "WeatherFactor",
-    "enhanced_weather_service",
+    # "enhanced_weather_service", # Removed
 ]

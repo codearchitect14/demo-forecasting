@@ -17,10 +17,11 @@ from sklearn.ensemble import RandomForestClassifier, GradientBoostingRegressor
 from sklearn.preprocessing import StandardScaler
 from sklearn.metrics import classification_report, mean_absolute_error
 import warnings
+from fastapi import Request  # Import Request
 
 warnings.filterwarnings("ignore")
 
-from database.connection import db_manager
+# from database.connection import db_manager # Removed
 
 logger = logging.getLogger(__name__)
 
@@ -67,44 +68,48 @@ class EnhancedStockoutService:
         self.risk_models: Dict[str, Any] = {}
 
     async def assess_stockout_risk(
-        self, request: StockoutAssessmentRequest
+        self, request_data: StockoutAssessmentRequest, request: Request  # Add request
     ) -> StockoutAssessmentResult:
         """Comprehensive stockout risk assessment"""
 
-        logger.info(f"Assessing stockout risk for {len(request.product_ids)} products")
+        logger.info(
+            f"Assessing stockout risk for {len(request_data.product_ids)} products"
+        )
 
         # Get comprehensive data
-        historical_data = await self._get_stockout_historical_data(request)
+        historical_data = await self._get_stockout_historical_data(
+            request_data, request
+        )  # Pass request
 
         if historical_data.empty:
             raise ValueError("No historical data available")
 
         # Assess current risk levels
         risk_assessments = await self._assess_current_risk_levels(
-            historical_data, request
+            historical_data, request_data
         )
 
         # Hourly predictions
         hourly_predictions = None
-        if request.include_hourly_prediction:
+        if request_data.include_hourly_prediction:
             hourly_predictions = await self._predict_hourly_stockouts(
-                historical_data, request
+                historical_data, request_data
             )
 
         # Cross-store optimization
         cross_store_optimization = None
-        if request.include_cross_store_optimization:
+        if request_data.include_cross_store_optimization:
             cross_store_optimization = await self._optimize_cross_store_inventory(
-                historical_data, request
+                historical_data, request_data
             )
 
         # Generate reorder recommendations
         reorder_recommendations = self._generate_reorder_recommendations(
-            risk_assessments, request
+            risk_assessments, request_data
         )
 
         # Generate early warnings
-        early_warnings = self._generate_early_warnings(risk_assessments, request)
+        early_warnings = self._generate_early_warnings(risk_assessments, request_data)
 
         return StockoutAssessmentResult(
             risk_assessments=risk_assessments,
@@ -115,17 +120,20 @@ class EnhancedStockoutService:
         )
 
     async def _get_stockout_historical_data(
-        self, request: StockoutAssessmentRequest
+        self, request_data: StockoutAssessmentRequest, request: Request  # Add request
     ) -> pd.DataFrame:
         """Get historical stockout and sales data"""
 
         end_date = datetime.now()
         start_date = end_date - timedelta(days=180)  # 6 months of history
 
+        # Access db_manager from app.state
+        manager = request.app.state.db_manager
+
         # Get sales data with stockout information
-        sales_data = await db_manager.get_sales_data(
-            store_ids=request.store_ids,
-            product_ids=request.product_ids,
+        sales_data = await manager.get_sales_data(  # Use manager.get_sales_data
+            store_ids=request_data.store_ids,
+            product_ids=request_data.product_ids,
             start_date=start_date,
             end_date=end_date,
             include_hourly=True,
@@ -133,11 +141,13 @@ class EnhancedStockoutService:
         )
 
         # Get stockout events
-        stockout_events = await db_manager.get_stockout_events(
-            store_ids=request.store_ids,
-            product_ids=request.product_ids,
-            start_date=start_date,
-            end_date=end_date,
+        stockout_events = (
+            await manager.get_stockout_events(  # Use manager.get_stockout_events
+                store_ids=request_data.store_ids,
+                product_ids=request_data.product_ids,
+                start_date=start_date,
+                end_date=end_date,
+            )
         )
 
         # Merge stockout event data
@@ -185,7 +195,9 @@ class EnhancedStockoutService:
         data["sale_date"] = pd.to_datetime(data["sale_date"])
         data["day_of_week"] = data["sale_date"].dt.dayofweek
         data["month"] = data["sale_date"].dt.month
-        data["is_weekend"] = data["day_of_week"].isin([5, 6]).astype(int)
+        data["is_weekend"] = (
+            data["day_of_week"].isin([5, 6]).astype(int)
+        )  # Corrected column name
         data["is_month_end"] = (data["sale_date"].dt.day > 25).astype(int)
 
         # Add lag features
@@ -670,13 +682,13 @@ class EnhancedStockoutService:
         return warnings[:20]  # Return top 20 warnings
 
 
-# Export the service
-enhanced_stockout_service = EnhancedStockoutService()
+# Export the service - REMOVED GLOBAL INSTANTIATION
+# enhanced_stockout_service = EnhancedStockoutService()
 
 __all__ = [
     "EnhancedStockoutService",
     "StockoutAssessmentRequest",
     "StockoutAssessmentResult",
     "RiskLevel",
-    "enhanced_stockout_service",
+    # "enhanced_stockout_service", # Removed
 ]

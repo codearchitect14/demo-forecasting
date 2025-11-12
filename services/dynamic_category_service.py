@@ -9,7 +9,7 @@ from typing import Dict, Any, Optional, List
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from database.connection import get_pool
+from fastapi import Request
 
 logger = logging.getLogger(__name__)
 
@@ -22,13 +22,14 @@ class DynamicCategoryService:
 
     async def get_category_data(
         self,
+        request: Request,
         category_id: Optional[int] = None,
         store_id: Optional[int] = None,
         limit: int = 5000,
     ) -> pd.DataFrame:
         """Fetch actual category sales data from database."""
 
-        pool = await get_pool()
+        manager = request.app.state.db_manager
 
         query = """
         SELECT 
@@ -66,7 +67,7 @@ class DynamicCategoryService:
         query += f" ORDER BY sd.dt DESC LIMIT ${len(params) + 1}"
         params.append(limit)
 
-        async with pool.acquire() as connection:
+        async with manager.get_connection() as connection:
             rows = await connection.fetch(query, *params)
 
         if not rows:
@@ -77,13 +78,16 @@ class DynamicCategoryService:
         return df
 
     async def analyze_category_performance(
-        self, category_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        category_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Analyze category performance with dynamic insights."""
 
         try:
             # Get actual data
-            df = await self.get_category_data(category_id, store_id)
+            df = await self.get_category_data(request, category_id, store_id)
 
             if df.empty:
                 return {"error": "No data found for the specified criteria"}
@@ -98,7 +102,9 @@ class DynamicCategoryService:
 
                 # Calculate market share (compared to all categories in same store)
                 if store_id:
-                    all_store_data = await self.get_category_data(None, store_id)
+                    all_store_data = await self.get_category_data(
+                        request, None, store_id
+                    )
                     store_total = all_store_data["sale_amount"].sum()
                     market_share = (
                         (total_sales / store_total * 100) if store_total > 0 else 0
@@ -272,11 +278,14 @@ class DynamicCategoryService:
         return {"peak_months": [12], "low_months": [2], "pattern": "insufficient_data"}
 
     async def get_category_recommendations(
-        self, category_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        category_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> List[str]:
         """Generate dynamic category-specific recommendations."""
 
-        df = await self.get_category_data(category_id, store_id)
+        df = await self.get_category_data(request, category_id, store_id)
         recommendations = []
 
         if df.empty:
@@ -366,11 +375,14 @@ class DynamicCategoryService:
         return recommendations
 
     async def analyze_market_share(
-        self, category_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        category_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Analyze market share for categories."""
         try:
-            df = await self.get_category_data(category_id, store_id)
+            df = await self.get_category_data(request, category_id, store_id)
             if df.empty:
                 return self._generate_simulated_market_share()
 
@@ -437,11 +449,14 @@ class DynamicCategoryService:
             return self._generate_simulated_market_share()
 
     async def optimize_product_portfolio(
-        self, category_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        category_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Optimize product portfolio."""
         try:
-            df = await self.get_category_data(category_id, store_id)
+            df = await self.get_category_data(request, category_id, store_id)
             if df.empty:
                 return self._generate_simulated_portfolio_optimization()
 
@@ -518,11 +533,14 @@ class DynamicCategoryService:
             return self._generate_simulated_portfolio_optimization()
 
     async def analyze_category_correlations(
-        self, category_id: Optional[int] = None, store_id: Optional[int] = None
+        self,
+        request: Request,
+        category_id: Optional[int] = None,
+        store_id: Optional[int] = None,
     ) -> Dict[str, Any]:
         """Analyze category correlations."""
         try:
-            df = await self.get_category_data(category_id, store_id)
+            df = await self.get_category_data(request, category_id, store_id)
             if df.empty:
                 return self._generate_simulated_category_correlations()
 

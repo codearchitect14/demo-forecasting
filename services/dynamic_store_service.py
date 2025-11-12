@@ -9,7 +9,9 @@ from typing import Dict, Any, Optional, List
 import pandas as pd
 import numpy as np
 from datetime import datetime, timedelta
-from database.connection import get_pool
+from fastapi import Request
+
+# from database.connection import get_pool
 
 logger = logging.getLogger(__name__)
 
@@ -22,11 +24,14 @@ class DynamicStoreService:
         self.store_clusters = {}
 
     async def get_store_data(
-        self, store_id: Optional[int] = None, limit: int = 2000
+        self,
+        request: Request,
+        store_id: Optional[int] = None,
+        limit: int = 2000,
     ) -> pd.DataFrame:
         """Fetch actual store performance data from database."""
 
-        pool = await get_pool()
+        manager = request.app.state.db_manager
 
         query = """
         SELECT 
@@ -57,7 +62,7 @@ class DynamicStoreService:
         query += f" ORDER BY sd.dt DESC LIMIT ${len(params) + 1}"
         params.append(limit)
 
-        async with pool.acquire() as connection:
+        async with manager.get_connection() as connection:
             rows = await connection.fetch(query, *params)
 
         if not rows:
@@ -68,16 +73,18 @@ class DynamicStoreService:
         return df
 
     async def analyze_store_clustering(
-        self, store_id: Optional[int] = None
+        self, request: Request, store_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Analyze store performance and clustering."""
 
         try:
             # Get data for target store and all stores for comparison
             target_store_data = (
-                await self.get_store_data(store_id) if store_id else pd.DataFrame()
+                await self.get_store_data(request, store_id)
+                if store_id
+                else pd.DataFrame()
             )
-            all_stores_data = await self.get_store_data(None, limit=5000)
+            all_stores_data = await self.get_store_data(request, None, limit=5000)
 
             if all_stores_data.empty:
                 return {"error": "No store data found"}
@@ -116,11 +123,11 @@ class DynamicStoreService:
             return {"error": f"Analysis failed: {str(e)}"}
 
     async def analyze_store_performance_ranking(
-        self, store_id: Optional[int] = None
+        self, request: Request, store_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Analyze store performance ranking."""
         try:
-            df = await self.get_store_data(store_id)
+            df = await self.get_store_data(request, store_id)
             if df.empty:
                 return self._generate_simulated_performance_ranking()
 
@@ -137,11 +144,11 @@ class DynamicStoreService:
             return self._generate_simulated_performance_ranking()
 
     async def identify_best_practices(
-        self, store_id: Optional[int] = None
+        self, request: Request, store_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Identify best practices."""
         try:
-            df = await self.get_store_data(store_id)
+            df = await self.get_store_data(request, store_id)
             if df.empty:
                 return self._generate_simulated_best_practices()
 
@@ -158,11 +165,11 @@ class DynamicStoreService:
             return self._generate_simulated_best_practices()
 
     async def detect_store_anomalies(
-        self, store_id: Optional[int] = None
+        self, request: Request, store_id: Optional[int] = None
     ) -> Dict[str, Any]:
         """Detect store anomalies."""
         try:
-            df = await self.get_store_data(store_id)
+            df = await self.get_store_data(request, store_id)
             if df.empty:
                 return self._generate_simulated_anomaly_detection()
 

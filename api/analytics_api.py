@@ -4,7 +4,14 @@ Provides comprehensive endpoints for real-time alerts, inventory optimization,
 portfolio analysis, customer behavior insights, and business intelligence.
 """
 
-from fastapi import APIRouter, HTTPException, Query, Body, Depends
+from fastapi import (
+    APIRouter,
+    HTTPException,
+    Query,
+    Body,
+    Depends,
+    Request,
+)  # Import Request
 from fastapi.responses import JSONResponse
 from typing import Dict, List, Optional, Any
 from datetime import datetime, timedelta
@@ -20,11 +27,11 @@ from utils.logger import get_logger
 
 logger = get_logger(__name__)
 
-# Initialize services
-alerts_service = RealTimeAlertsService()
-inventory_service = InventoryOptimizationService()
-portfolio_service = PortfolioAnalysisService()
-customer_service = CustomerBehaviorService()
+# Initialize services - REMOVED GLOBAL INSTANTIATION
+# alerts_service = RealTimeAlertsService()
+# inventory_service = InventoryOptimizationService()
+# portfolio_service = PortfolioAnalysisService()
+# customer_service = CustomerBehaviorService()
 
 router = APIRouter(prefix="/api/analytics", tags=["Analytics Intelligence"])
 
@@ -69,7 +76,7 @@ class CustomerAnalysisRequest(BaseModel):
     summary="Run Real-Time Business Monitoring",
     description="Execute comprehensive monitoring across all stores and generate intelligent alerts",
 )
-async def monitor_business_operations():
+async def monitor_business_operations(request: Request):  # Add request
     """
     Run comprehensive real-time monitoring across all business operations.
     Generates alerts for stockouts, demand anomalies, weather impacts,
@@ -78,11 +85,16 @@ async def monitor_business_operations():
     try:
         logger.info("Starting comprehensive business monitoring")
 
+        # Initialize service within the endpoint to access request.app.state
+        alerts_service = RealTimeAlertsService()
+
         # Run monitoring
-        alerts = await alerts_service.monitor_all_stores()
+        alerts = await alerts_service.monitor_all_stores(request)  # Pass request
 
         # Get alert summary
-        summary = await alerts_service.get_alert_summary(days=1)
+        summary = await alerts_service.get_alert_summary(
+            request, days=1
+        )  # Pass request
 
         return {
             "status": "success",
@@ -115,6 +127,7 @@ async def monitor_business_operations():
     description="Retrieve all active alerts with optional filtering",
 )
 async def get_active_alerts(
+    request: Request,  # Add request
     store_id: Optional[int] = Query(None, description="Filter by store ID"),
     severity: Optional[str] = Query(
         None,
@@ -127,8 +140,9 @@ async def get_active_alerts(
 ):
     """Get active alerts with optional filtering by store and severity."""
     try:
+        alerts_service = RealTimeAlertsService()  # Instantiate service
         alerts = await alerts_service.get_active_alerts(
-            store_id=store_id, severity=severity
+            request, store_id=store_id, severity=severity  # Pass request
         )
 
         # Limit results
@@ -155,13 +169,17 @@ async def get_active_alerts(
 )
 async def acknowledge_alert(
     alert_id: str,
+    request: Request,  # Move request before default arguments
     acknowledged_by: str = Body(
         ..., embed=True, description="Username or ID of person acknowledging"
     ),
 ):
     """Acknowledge a specific alert."""
     try:
-        success = await alerts_service.acknowledge_alert(alert_id, acknowledged_by)
+        alerts_service = RealTimeAlertsService()  # Instantiate service
+        success = await alerts_service.acknowledge_alert(
+            alert_id, acknowledged_by, request
+        )  # Pass request
 
         if success:
             return {
@@ -186,11 +204,15 @@ async def acknowledge_alert(
     description="Get comprehensive alert statistics and trends",
 )
 async def get_alert_summary(
-    days: int = Query(7, ge=1, le=90, description="Number of days to analyze")
+    request: Request,  # Add request
+    days: int = Query(7, ge=1, le=90, description="Number of days to analyze"),
 ):
     """Get alert summary statistics for the specified period."""
     try:
-        summary = await alerts_service.get_alert_summary(days=days)
+        alerts_service = RealTimeAlertsService()  # Instantiate service
+        summary = await alerts_service.get_alert_summary(
+            request, days=days
+        )  # Pass request
 
         return {"status": "success", "analysis_period_days": days, "summary": summary}
 
@@ -211,7 +233,9 @@ async def get_alert_summary(
     summary="Analyze Cross-Store Inventory Optimization",
     description="Identify inventory transfer opportunities and optimization recommendations",
 )
-async def analyze_inventory_optimization(request: InventoryOptimizationRequest):
+async def analyze_inventory_optimization(
+    request_body: InventoryOptimizationRequest, request: Request
+):  # Add request
     """
     Analyze cross-store inventory optimization opportunities.
     Identifies transfer opportunities, calculates optimization scores,
@@ -219,19 +243,21 @@ async def analyze_inventory_optimization(request: InventoryOptimizationRequest):
     """
     try:
         logger.info(
-            f"Starting inventory optimization analysis for city_id={request.city_id}, store_id={request.store_id}"
+            f"Starting inventory optimization analysis for city_id={request_body.city_id}, store_id={request_body.store_id}"
         )
+
+        inventory_service = InventoryOptimizationService()  # Instantiate service
 
         # Run optimization analysis
         opportunities = await inventory_service.analyze_cross_store_opportunities(
-            city_id=request.city_id
+            request, city_id=request_body.city_id  # Pass request
         )
 
         # Filter by minimum optimization score
         filtered_opportunities = [
             opp
             for opp in opportunities
-            if float(opp.optimization_score) >= request.min_optimization_score
+            if float(opp.optimization_score) >= request_body.min_optimization_score
         ]
 
         # Get summary statistics
@@ -278,9 +304,9 @@ async def analyze_inventory_optimization(request: InventoryOptimizationRequest):
                 for opp in filtered_opportunities[:20]  # Top 20 opportunities
             ],
             "filters_applied": {
-                "city_id": request.city_id,
-                "store_id": request.store_id,
-                "min_optimization_score": request.min_optimization_score,
+                "city_id": request_body.city_id,
+                "store_id": request_body.store_id,
+                "min_optimization_score": request_body.min_optimization_score,
             },
         }
 
@@ -296,10 +322,13 @@ async def analyze_inventory_optimization(request: InventoryOptimizationRequest):
     summary="Get Store Inventory Optimization Summary",
     description="Get optimization summary for a specific store",
 )
-async def get_store_inventory_summary(store_id: int):
+async def get_store_inventory_summary(store_id: int, request: Request):  # Add request
     """Get inventory optimization summary for a specific store."""
     try:
-        summary = await inventory_service.get_store_optimization_summary(store_id)
+        inventory_service = InventoryOptimizationService()  # Instantiate service
+        summary = await inventory_service.get_store_optimization_summary(
+            request, store_id
+        )  # Pass request
 
         return {"status": "success", "store_id": store_id, "summary": summary}
 
@@ -315,10 +344,13 @@ async def get_store_inventory_summary(store_id: int):
     summary="Get City Inventory Overview",
     description="Get comprehensive inventory optimization overview for a city",
 )
-async def get_city_inventory_overview(city_id: int):
+async def get_city_inventory_overview(city_id: int, request: Request):  # Add request
     """Get inventory optimization overview for an entire city."""
     try:
-        overview = await inventory_service.get_city_optimization_overview(city_id)
+        inventory_service = InventoryOptimizationService()  # Instantiate service
+        overview = await inventory_service.get_city_optimization_overview(
+            request, city_id
+        )  # Pass request
 
         return {"status": "success", "city_id": city_id, "overview": overview}
 
@@ -335,12 +367,21 @@ async def get_city_inventory_overview(city_id: int):
     description="Execute an inventory transfer recommendation",
 )
 async def execute_inventory_transfer(
-    source_store_id: int, target_store_id: int, product_id: int, quantity: int
+    source_store_id: int,
+    target_store_id: int,
+    product_id: int,
+    quantity: int,
+    request: Request,  # Add request
 ):
     """Execute an inventory transfer recommendation."""
     try:
+        inventory_service = InventoryOptimizationService()  # Instantiate service
         result = await inventory_service.execute_transfer_recommendation(
-            source_store_id, target_store_id, product_id, quantity
+            source_store_id,
+            target_store_id,
+            product_id,
+            quantity,
+            request,  # Pass request
         )
 
         return {"status": "success", "execution_result": result}
@@ -362,7 +403,9 @@ async def execute_inventory_transfer(
     summary="Analyze Product Portfolio",
     description="Comprehensive portfolio analysis including correlations, bundles, and category insights",
 )
-async def analyze_product_portfolio(request: PortfolioAnalysisRequest):
+async def analyze_product_portfolio(
+    request_body: PortfolioAnalysisRequest, request: Request
+):  # Add request
     """
     Perform comprehensive product portfolio analysis.
     Includes product correlations, bundle opportunities, category analysis,
@@ -370,12 +413,16 @@ async def analyze_product_portfolio(request: PortfolioAnalysisRequest):
     """
     try:
         logger.info(
-            f"Starting portfolio analysis for store_id={request.store_id}, city_id={request.city_id}"
+            f"Starting portfolio analysis for store_id={request_body.store_id}, city_id={request_body.city_id}"
         )
+
+        portfolio_service = PortfolioAnalysisService()  # Instantiate service
 
         # Run portfolio analysis
         analysis = await portfolio_service.analyze_product_portfolio(
-            store_id=request.store_id, city_id=request.city_id
+            request,
+            store_id=request_body.store_id,
+            city_id=request_body.city_id,  # Pass request
         )
 
         # Filter components based on request
@@ -383,13 +430,13 @@ async def analyze_product_portfolio(request: PortfolioAnalysisRequest):
             "status": "success",
             "analysis_timestamp": analysis.get("analysis_timestamp"),
             "scope": {
-                "store_id": request.store_id,
-                "city_id": request.city_id,
+                "store_id": request_body.store_id,
+                "city_id": request_body.city_id,
                 "analysis_depth": "comprehensive",
             },
         }
 
-        if request.include_correlations:
+        if request_body.include_correlations:
             filtered_analysis["product_correlations"] = {
                 "total_correlations": len(analysis.get("correlations", [])),
                 "strong_positive_correlations": len(
@@ -418,7 +465,7 @@ async def analyze_product_portfolio(request: PortfolioAnalysisRequest):
                 ],
             }
 
-        if request.include_bundles:
+        if request_body.include_bundles:
             filtered_analysis["bundle_opportunities"] = {
                 "total_bundles": len(analysis.get("bundle_opportunities", [])),
                 "high_confidence_bundles": len(
@@ -447,7 +494,7 @@ async def analyze_product_portfolio(request: PortfolioAnalysisRequest):
                 ],
             }
 
-        if request.include_categories:
+        if request_body.include_categories:
             filtered_analysis["category_analysis"] = {
                 "total_categories": len(analysis.get("category_analysis", [])),
                 "market_leaders": len(
@@ -499,10 +546,13 @@ async def analyze_product_portfolio(request: PortfolioAnalysisRequest):
     summary="Track Bundle Performance",
     description="Track performance of implemented product bundles",
 )
-async def track_bundle_performance(bundle_id: str):
+async def track_bundle_performance(bundle_id: str, request: Request):  # Add request
     """Track performance of a specific product bundle."""
     try:
-        performance = await portfolio_service.get_bundle_performance_tracking(bundle_id)
+        portfolio_service = PortfolioAnalysisService()  # Instantiate service
+        performance = await portfolio_service.get_bundle_performance_tracking(
+            request, bundle_id
+        )  # Pass request
 
         return {"status": "success", "bundle_performance": performance}
 
@@ -516,11 +566,14 @@ async def track_bundle_performance(bundle_id: str):
     summary="Get Portfolio Optimization Recommendations",
     description="Get strategic recommendations for portfolio optimization",
 )
-async def get_portfolio_recommendations(city_id: int):
+async def get_portfolio_recommendations(city_id: int, request: Request):  # Add request
     """Get portfolio optimization recommendations for a city."""
     try:
+        portfolio_service = PortfolioAnalysisService()  # Instantiate service
         recommendations = (
-            await portfolio_service.get_portfolio_optimization_recommendations(city_id)
+            await portfolio_service.get_portfolio_optimization_recommendations(
+                request, city_id
+            )  # Pass request
         )
 
         return {
@@ -550,7 +603,9 @@ async def get_portfolio_recommendations(city_id: int):
     summary="Analyze Customer Behavior",
     description="Comprehensive customer behavior analysis and segmentation",
 )
-async def analyze_customer_behavior(request: CustomerAnalysisRequest):
+async def analyze_customer_behavior(
+    request_body: CustomerAnalysisRequest, request: Request
+):  # Add request
     """
     Perform comprehensive customer behavior analysis.
     Includes customer segmentation, shopping patterns, lifecycle analysis,
@@ -558,16 +613,20 @@ async def analyze_customer_behavior(request: CustomerAnalysisRequest):
     """
     try:
         logger.info(
-            f"Starting customer behavior analysis for store_id={request.store_id}, city_id={request.city_id}"
+            f"Starting customer behavior analysis for store_id={request_body.store_id}, city_id={request_body.city_id}"
         )
+
+        customer_service = CustomerBehaviorService()  # Instantiate service
 
         # Run customer behavior analysis
         analysis = await customer_service.analyze_customer_behavior(
-            store_id=request.store_id, city_id=request.city_id
+            request,
+            store_id=request_body.store_id,
+            city_id=request_body.city_id,  # Pass request
         )
 
         # Format response based on analysis depth
-        if request.analysis_depth == "basic":
+        if request_body.analysis_depth == "basic":
             return {
                 "status": "success",
                 "analysis_timestamp": analysis.get("analysis_timestamp"),
@@ -577,14 +636,14 @@ async def analyze_customer_behavior(request: CustomerAnalysisRequest):
                 "top_insights": analysis.get("actionable_insights", [])[:3],
             }
 
-        elif request.analysis_depth == "comprehensive":
+        elif request_body.analysis_depth == "comprehensive":
             return {
                 "status": "success",
                 "analysis_timestamp": analysis.get("analysis_timestamp"),
                 "scope": {
-                    "store_id": request.store_id,
-                    "city_id": request.city_id,
-                    "analysis_depth": request.analysis_depth,
+                    "store_id": request_body.store_id,
+                    "city_id": request_body.city_id,
+                    "analysis_depth": request_body.analysis_depth,
                 },
                 "customer_segmentation": {
                     "total_segments": len(analysis.get("customer_segments", [])),
@@ -677,10 +736,15 @@ async def analyze_customer_behavior(request: CustomerAnalysisRequest):
     summary="Get Customer Segment Details",
     description="Get detailed information about a specific customer segment",
 )
-async def get_customer_segment_details(segment_name: str):
+async def get_customer_segment_details(
+    segment_name: str, request: Request
+):  # Add request
     """Get detailed information about a specific customer segment."""
     try:
-        details = await customer_service.get_customer_segment_details(segment_name)
+        customer_service = CustomerBehaviorService()  # Instantiate service
+        details = await customer_service.get_customer_segment_details(
+            request, segment_name
+        )  # Pass request
 
         return {"status": "success", "segment_details": details}
 
@@ -702,6 +766,7 @@ async def get_customer_segment_details(segment_name: str):
     description="Get comprehensive overview for analytics dashboard",
 )
 async def get_analytics_dashboard_overview(
+    request: Request,  # Add request
     city_id: Optional[int] = Query(None, description="Filter by city ID"),
     store_id: Optional[int] = Query(None, description="Filter by store ID"),
     days: int = Query(7, ge=1, le=90, description="Analysis period in days"),
@@ -715,8 +780,12 @@ async def get_analytics_dashboard_overview(
             f"Generating analytics dashboard overview for city_id={city_id}, store_id={store_id}"
         )
 
+        alerts_service = RealTimeAlertsService()  # Instantiate service
+
         # Run parallel queries for dashboard data
-        alert_summary_task = alerts_service.get_alert_summary(days=days)
+        alert_summary_task = alerts_service.get_alert_summary(
+            request, days=days
+        )  # Pass request
 
         # Execute all tasks in parallel
         alert_summary = await alert_summary_task
@@ -802,6 +871,7 @@ async def get_analytics_dashboard_overview(
     description="Generate AI-powered business insights across all analytical dimensions",
 )
 async def generate_comprehensive_insights(
+    request: Request,  # Add request
     city_id: Optional[int] = None,
     store_id: Optional[int] = None,
     focus_areas: List[str] = Body(
@@ -815,6 +885,12 @@ async def generate_comprehensive_insights(
     """
     try:
         logger.info(f"Generating comprehensive insights for focus_areas={focus_areas}")
+
+        # Instantiate services as needed
+        alerts_service = RealTimeAlertsService()
+        inventory_service = InventoryOptimizationService()
+        portfolio_service = PortfolioAnalysisService()
+        customer_service = CustomerBehaviorService()
 
         insights = {
             "status": "success",
@@ -832,10 +908,13 @@ async def generate_comprehensive_insights(
 
         # Generate insights based on focus areas
         if "alerts" in focus_areas:
+            # Example of calling a service method that uses the request object
+            # You might want to get more specific alerts or summaries here
+            alert_summary = await alerts_service.get_alert_summary(request, days=7)
             insights["strategic_insights"].append(
                 {
                     "category": "operational_excellence",
-                    "insight": "Real-time monitoring reveals 3 critical operational patterns requiring immediate attention",
+                    "insight": f"Real-time monitoring reveals {alert_summary.get('total_alerts')} total alerts and {alert_summary.get('by_severity', {}).get('critical', 0)} critical operational patterns requiring immediate attention",
                     "impact": "high",
                     "confidence": 0.92,
                     "recommendation": "Implement automated response protocols for critical alerts to reduce response time by 60%",
@@ -843,33 +922,44 @@ async def generate_comprehensive_insights(
             )
 
         if "inventory" in focus_areas:
+            inventory_opportunities = (
+                await inventory_service.analyze_cross_store_opportunities(
+                    request, city_id=city_id
+                )
+            )
             insights["tactical_recommendations"].append(
                 {
                     "category": "inventory_optimization",
-                    "recommendation": "Execute 8 high-priority inventory transfers within 48 hours",
-                    "expected_benefit": "$12,000 revenue protection + $3,000 transfer savings",
+                    "recommendation": f"Execute {len(inventory_opportunities)} high-priority inventory transfers within 48 hours",
+                    "expected_benefit": "$12,000 revenue protection + $3,000 transfer savings",  # Placeholder
                     "implementation_effort": "medium",
                     "success_probability": 0.85,
                 }
             )
 
         if "portfolio" in focus_areas:
+            portfolio_analysis = await portfolio_service.analyze_product_portfolio(
+                request, store_id=store_id, city_id=city_id
+            )
             insights["performance_opportunities"].append(
                 {
                     "category": "revenue_growth",
-                    "opportunity": "Product bundle implementation with 75% success rate",
-                    "revenue_potential": "$18,000 quarterly",
+                    "opportunity": f"Product bundle implementation with {len(portfolio_analysis.get('bundle_opportunities', []))} bundles, and {len(portfolio_analysis.get('correlations', []))} correlation patterns",
+                    "revenue_potential": "$18,000 quarterly",  # Placeholder
                     "market_timing": "optimal",
                     "competitive_advantage": "high",
                 }
             )
 
         if "customers" in focus_areas:
+            customer_analysis = await customer_service.analyze_customer_behavior(
+                request, store_id=store_id, city_id=city_id, analysis_depth="basic"
+            )
             insights["risk_assessments"].append(
                 {
                     "category": "customer_retention",
-                    "risk": "22% churn rate among high-value customer segment",
-                    "potential_loss": "$45,000 annual revenue",
+                    "risk": f"{customer_analysis.get('customer_segments_count')} customer segments identified with churn risk",
+                    "potential_loss": "$45,000 annual revenue",  # Placeholder
                     "mitigation_strategy": "Personalized retention campaign with loyalty incentives",
                     "urgency": "high",
                 }
@@ -901,10 +991,28 @@ async def generate_comprehensive_insights(
     summary="Analytics API Health Check",
     description="Check health status of all analytical services",
 )
-async def health_check():
+async def health_check(request: Request):  # Add request
     """Check health status of all analytical services."""
     try:
         # Test basic functionality of each service
+        alerts_service = RealTimeAlertsService()
+        inventory_service = InventoryOptimizationService()
+        portfolio_service = PortfolioAnalysisService()
+        customer_service = CustomerBehaviorService()
+
+        # Try to call a simple method that uses the database connection
+        # This will indirectly check if the DatabaseManager is accessible
+        await alerts_service.get_alert_summary(request, days=1)
+        await inventory_service.get_city_optimization_overview(
+            request, city_id=1
+        )  # Use a dummy city_id
+        await portfolio_service.get_portfolio_optimization_recommendations(
+            request, city_id=1
+        )  # Use a dummy city_id
+        await customer_service.get_customer_segment_details(
+            request, segment_name="dummy"
+        )  # Use a dummy segment_name
+
         service_health = {
             "alerts_service": "healthy",
             "inventory_service": "healthy",

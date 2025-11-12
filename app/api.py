@@ -7,7 +7,14 @@ from datetime import datetime, timedelta, date
 from typing import List, Dict, Any, Optional
 
 import asyncpg
-from fastapi import FastAPI, HTTPException, Query, Depends, Path
+from fastapi import (
+    FastAPI,
+    HTTPException,
+    Query,
+    Depends,
+    Path,
+    Request,
+)  # Import Request
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 from models.forecast_models import (
@@ -29,7 +36,9 @@ from services.forecast_service import (
 from services.model_loader import get_forecast_model, get_promo_model
 import traceback
 from contextlib import asynccontextmanager
-from database.connection import db_manager
+from fastapi import APIRouter  # Import APIRouter
+from database.connection import cached  # Still need cached decorator
+
 
 # Import analytics router
 from api.analytics_api import router as analytics_router
@@ -38,26 +47,24 @@ from api.multi_dimensional_forecast import router as multi_dimensional_router
 from api.clustering_segmentation import router as clustering_router
 
 # Create FastAPI app
-app = FastAPI(
-    title="FreshRetail Forecasting API",
-    description="API for retail sales forecasting and analysis",
-    version="1.0.0",
-)
-
-# Add CORS middleware
-app.add_middleware(
-    CORSMiddleware,
-    allow_origins=["*"],
-    allow_credentials=True,
-    allow_methods=["*"],
-    allow_headers=["*"],
+# app = FastAPI(
+#     title="FreshRetail Forecasting API",
+#     description="API for retail sales forecasting and analysis",
+#     version="1.0.0",
+# )
+router = APIRouter(
+    prefix="",  # Adjust prefix as needed, usually empty if integrated into main app at a specific /api prefix
+    tags=["Core API"],
 )
 
 # Include analytics router
-app.include_router(analytics_router)
-app.include_router(enhanced_router)
-app.include_router(multi_dimensional_router)
-app.include_router(clustering_router)
+router.include_router(analytics_router)
+router.include_router(enhanced_router)
+router.include_router(multi_dimensional_router)
+router.include_router(clustering_router)
+
+# Export the router as 'app' for main.py to import
+app = router
 
 
 def format_floats_recursive(data: Any, decimals: int = 2) -> Any:
@@ -96,37 +103,28 @@ class StoreInsightsRequest(BaseModel):
     n_clusters: int = 5
 
 
-# Dependency for getting a connection (to be implemented in main app)
-async def get_db_connection():
-    # Replace with your actual connection pool logic
-    return await asyncpg.connect(
-        dsn=os.getenv(
-            "DATABASE_URL", "postgresql://user:password@localhost:5432/dbname"
-        )
-    )
-
-
-async def get_db():
+async def get_db(request: Request):  # Accept request object
     """Get database connection context manager"""
     try:
-        if not db_manager.pool:
-            await db_manager.initialize()
-        return db_manager.get_connection()
+        manager = request.app.state.db_manager  # Access from app.state
+        if not manager.pool:
+            raise RuntimeError("Database pool not initialized. Check startup events.")
+        return manager.get_connection()
     except Exception as e:
         print(f"Database connection failed: {e}")
         raise HTTPException(status_code=500, detail="Database connection failed")
 
 
-@app.get("/")
+@router.get("/")
 async def root():
     """Root endpoint"""
     return {"status": "ok", "message": "FreshRetail Forecasting API is running"}
 
 
-@app.get("/cities")
-async def get_cities():
+@router.get("/cities")
+async def get_cities(request: Request):  # Accept request object
     try:
-        async with await get_db() as conn:
+        async with request.app.state.db_manager.get_connection() as conn:  # Access from app.state
             rows = await conn.fetch(
                 "SELECT city_id, city_name FROM city_hierarchy ORDER BY city_name"
             )
@@ -136,10 +134,10 @@ async def get_cities():
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
-@app.get("/stores")
-async def get_stores():
+@router.get("/stores")
+async def get_stores(request: Request):  # Accept request object
     try:
-        async with await get_db() as conn:
+        async with request.app.state.db_manager.get_connection() as conn:  # Access from app.state
             rows = await conn.fetch(
                 "SELECT s.store_id, s.store_name, s.city_id, c.city_name FROM store_hierarchy s LEFT JOIN city_hierarchy c ON s.city_id = c.city_id ORDER BY s.store_name"
             )
@@ -149,10 +147,10 @@ async def get_stores():
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
-@app.get("/products")
-async def get_products():
+@router.get("/products")
+async def get_products(request: Request):  # Accept request object
     try:
-        async with await get_db() as conn:
+        async with request.app.state.db_manager.get_connection() as conn:  # Access from app.state
             rows = await conn.fetch(
                 "SELECT product_id, product_name FROM product_hierarchy ORDER BY product_name"
             )
@@ -162,7 +160,7 @@ async def get_products():
         raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
 
-@app.post("/api/forecast", response_model=ForecastResponse)
+@router.post("/api/forecast", response_model=ForecastResponse)
 async def forecast(request: ForecastRequest, conn=Depends(get_db)):
     """Generate sales forecast"""
     try:
@@ -174,45 +172,41 @@ async def forecast(request: ForecastRequest, conn=Depends(get_db)):
             city_id=request.city_id,
             start_date=request.start_date,
             end_date=None,
-            conn=conn,
         )
         from services.forecast_service import generate_forecast
 
         result = await generate_forecast(
             model=model,
             request=request,
-            fetch_historical_data_fn=lambda **kwargs: fetch_historical_data(
+            fetch_historical_data_fn=lambda: fetch_historical_data(
                 store_id=request.store_id,
                 product_id=request.product_id,
                 category_id=request.category_id,
                 city_id=request.city_id,
                 start_date=request.start_date,
                 end_date=None,
-                conn=conn,
             ),
-            fetch_weather_data_fn=lambda **kwargs: fetch_weather_data(
+            fetch_weather_data_fn=lambda: fetch_weather_data(
                 city_id=request.city_id,
                 start_date=request.start_date,
                 end_date=None,
-                conn=conn,
             ),
-            fetch_promotion_data_fn=lambda **kwargs: fetch_promotion_data(
+            fetch_promotion_data_fn=lambda: fetch_promotion_data(
                 store_id=request.store_id,
                 product_id=request.product_id,
                 category_id=request.category_id,
                 start_date=request.start_date,
                 end_date=None,
-                conn=conn,
             ),
         )
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Forecast error: {str(e)}")
     finally:
-        await conn.close()
+        pass  # conn is managed by the dependency injection now, no need to close manually
 
 
-@app.post("/api/promotions/analyze")
+@router.post("/api/promotions/analyze")
 async def analyze_promotions(request: PromotionAnalysisRequest, conn=Depends(get_db)):
     """Analyze promotion effectiveness"""
     try:
@@ -224,7 +218,6 @@ async def analyze_promotions(request: PromotionAnalysisRequest, conn=Depends(get
             city_id=request.city_id,
             start_date=request.start_date,
             end_date=request.end_date,
-            conn=conn,
         )
         promo_data = await fetch_promotion_data(
             store_id=request.store_id,
@@ -232,7 +225,6 @@ async def analyze_promotions(request: PromotionAnalysisRequest, conn=Depends(get
             category_id=request.category_id,
             start_date=request.start_date,
             end_date=request.end_date,
-            conn=conn,
         )
         result = await analyze_promotion_effectiveness(
             df, promo_data, model, request.dict()
@@ -243,10 +235,10 @@ async def analyze_promotions(request: PromotionAnalysisRequest, conn=Depends(get
             status_code=500, detail=f"Promotion analysis error: {str(e)}"
         )
     finally:
-        await conn.close()
+        pass  # conn is managed by the dependency injection now, no need to close manually
 
 
-@app.post("/api/stockouts/analyze")
+@router.post("/api/stockouts/analyze")
 async def analyze_stockout_impact(
     request: StockoutAnalysisRequest, conn=Depends(get_db)
 ):
@@ -259,7 +251,6 @@ async def analyze_stockout_impact(
             city_id=None,
             start_date=request.start_date,
             end_date=request.end_date,
-            conn=conn,
         )
         result = await analyze_stockout(df, request.dict())
         return result
@@ -268,10 +259,10 @@ async def analyze_stockout_impact(
             status_code=500, detail=f"Stockout analysis error: {str(e)}"
         )
     finally:
-        await conn.close()
+        pass  # conn is managed by the dependency injection now, no need to close manually
 
 
-@app.post("/api/holidays/analyze")
+@router.post("/api/holidays/analyze")
 async def analyze_holiday_effects(request: HolidayImpactRequest, conn=Depends(get_db)):
     """Analyze holiday impact on sales"""
     try:
@@ -282,25 +273,23 @@ async def analyze_holiday_effects(request: HolidayImpactRequest, conn=Depends(ge
             city_id=None,
             start_date=request.start_date,
             end_date=request.end_date,
-            conn=conn,
         )
         holiday_data = await fetch_holiday_data(
             start_date=request.start_date,
             end_date=request.end_date,
-            conn=conn,
         )
         result = await analyze_holiday_impact(df, holiday_data, request.dict())
         return result
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Holiday analysis error: {str(e)}")
     finally:
-        await conn.close()
+        pass  # conn is managed by the dependency injection now, no need to close manually
 
 
 # NEW AI-POWERED ENDPOINTS FOR FRONTEND INTEGRATION
 
 
-@app.post("/weather/analyze")
+@router.post("/weather/analyze")
 async def analyze_weather_impact(request: WeatherAnalysisRequest, conn=Depends(get_db)):
     """
     Weather-sensitive demand analysis endpoint for frontend integration.
@@ -334,10 +323,10 @@ async def analyze_weather_impact(request: WeatherAnalysisRequest, conn=Depends(g
         print(f"Weather analysis error: {e}")
         return format_floats_recursive(get_fallback_weather_data())
     finally:
-        await conn.close()
+        pass  # conn is managed by the dependency injection now, no need to close manually
 
 
-@app.post("/category/performance")
+@router.post("/category/performance")
 async def analyze_category_performance(
     request: CategoryPerformanceRequest, conn=Depends(get_db)
 ):
@@ -371,10 +360,10 @@ async def analyze_category_performance(
         print(f"Category analysis error: {e}")
         return get_fallback_category_data()
     finally:
-        await conn.close()
+        pass  # conn is managed by the dependency injection now, no need to close manually
 
 
-@app.post("/stores/insights")
+@router.post("/stores/insights")
 async def analyze_store_clustering(request: StoreInsightsRequest, conn=Depends(get_db)):
     """
     Store clustering and behavior analysis endpoint for frontend integration.
@@ -427,7 +416,7 @@ async def analyze_store_clustering(request: StoreInsightsRequest, conn=Depends(g
         print(f"Clustering analysis error: {e}")
         return format_floats_recursive(get_fallback_clustering_data())
     finally:
-        await conn.close()
+        pass  # conn is managed by the dependency injection now, no need to close manually
 
 
 # Data transformation functions for the new AI endpoints
@@ -588,7 +577,7 @@ def get_fallback_clustering_data() -> Dict[str, Any]:
 # EXISTING ENDPOINTS (updated to maintain compatibility)
 
 
-@app.get("/forecast/{city_id}/{store_id}/{product_id}")
+@router.get("/forecast/{city_id}/{store_id}/{product_id}")
 async def forecast_get(
     city_id: int = Path(...),
     store_id: int = Path(...),
@@ -651,10 +640,10 @@ async def forecast_get(
             },
         }
     finally:
-        await conn.close()
+        pass  # conn is managed by the dependency injection now, no need to close manually
 
 
-@app.get("/promotions/impact/{store_id}/{product_id}")
+@router.get("/promotions/impact/{store_id}/{product_id}")
 async def promotions_impact_get(
     store_id: int,
     product_id: int,
@@ -702,7 +691,7 @@ async def promotions_impact_get(
         print(f"Promotion error: {e}")
         return format_floats_recursive(get_fallback_promotion_data())
     finally:
-        await conn.close()
+        pass  # conn is managed by the dependency injection now, no need to close manually
 
 
 def get_fallback_promotion_data():
@@ -728,7 +717,7 @@ def get_fallback_promotion_data():
     }
 
 
-@app.get("/stockout/risk/{store_id}/{product_id}")
+@router.get("/stockout/risk/{store_id}/{product_id}")
 async def stockout_risk_get(
     store_id: int = Path(...),
     product_id: int = Path(...),
@@ -762,7 +751,7 @@ async def stockout_risk_get(
         print(f"Stockout error: {e}")
         return format_floats_recursive(get_fallback_stockout_data())
     finally:
-        await conn.close()
+        pass  # conn is managed by the dependency injection now, no need to close manually
 
 
 def get_fallback_stockout_data():
@@ -792,7 +781,7 @@ def get_fallback_stockout_data():
     }
 
 
-@app.get("/valid-combinations")
+@router.get("/valid-combinations")
 async def get_valid_combinations(conn=Depends(get_db)):
     """Get valid data combinations for testing"""
     try:
@@ -824,10 +813,10 @@ async def get_valid_combinations(conn=Depends(get_db)):
     except Exception as e:
         return {"error": str(e)}
     finally:
-        await conn.close()
+        pass  # conn is managed by the dependency injection now, no need to close manually
 
 
-@app.get("/debug/data")
+@router.get("/debug/data")
 async def debug_data(conn=Depends(get_db)):
     """Debug endpoint to find valid data combinations"""
     try:
@@ -860,4 +849,4 @@ async def debug_data(conn=Depends(get_db)):
     except Exception as e:
         return {"error": str(e)}
     finally:
-        await conn.close()
+        pass  # conn is managed by the dependency injection now, no need to close manually
