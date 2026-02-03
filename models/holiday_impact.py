@@ -1,6 +1,4 @@
-"""
-Holiday impact analysis module for evaluating sales lift during holidays.
-"""
+
 
 import pandas as pd
 import numpy as np
